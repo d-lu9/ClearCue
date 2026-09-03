@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0f766e" />
+    <title>DropWise — Eye Drop Routine</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="topbar">
+        <div class="brand"><span class="brand-mark">◒</span><span>DropWise</span></div>
+        <button class="icon-button" id="helpButton" aria-label="Open help">?</button>
+      </header>
+
+      <section class="welcome" aria-labelledby="greeting">
+        <p class="eyebrow">TUESDAY, SEPTEMBER 1</p>
+        <h1 id="greeting">Good morning, Maya.</h1>
+        <p>Your eye-care routine, made easier.</p>
+      </section>
+
+      <section class="progress-card" aria-label="Today's progress">
+        <div>
+          <span class="eyebrow">TODAY'S ROUTINE</span>
+          <strong id="progressText">0 of 3 completed</strong>
+        </div>
+        <div class="progress-ring" id="progressRing" aria-label="0 percent complete"><span id="progressPercent">0%</span></div>
+      </section>
+
+      <section class="schedule-section" aria-labelledby="scheduleTitle">
+        <div class="section-heading">
+          <div><p class="eyebrow">UP NEXT</p><h2 id="scheduleTitle">Today’s schedule</h2></div>
+          <button class="text-button" id="viewHistory">History</button>
+        </div>
+        <div id="scheduleList" class="schedule-list"></div>
+      </section>
+
+      <section class="tip-card" aria-label="Eye drop tip">
+        <span class="tip-icon">✦</span>
+        <div><strong>Spacing matters</strong><p>Leave at least 5 minutes between different drops in the same eye.</p></div>
+      </section>
+    </main>
+
+    <button class="add-button" id="addMedication"><span>＋</span> Add eye drop</button>
+
+    <dialog id="medicationDialog">
+      <form method="dialog" id="medicationForm">
+        <div class="dialog-header"><div><p class="eyebrow">NEW ROUTINE</p><h2>Add an eye drop</h2></div><button class="icon-button" value="cancel" aria-label="Close">×</button></div>
+        <label>Medication name<input id="medName" required maxlength="50" placeholder="e.g. Artificial Tears" /></label>
+        <label>Which eye?<select id="medEye"><option>Left eye</option><option>Right eye</option><option>Both eyes</option></select></label>
+        <label>Cap / label color<input id="medColor" type="color" value="#36a8e0" /></label>
+        <label>First reminder time<input id="medTime" type="time" value="09:00" required /></label>
+        <label>Times per day<select id="medFrequency"><option value="1">Once daily</option><option value="2">Twice daily</option><option value="3">3 times daily</option><option value="4">4 times daily</option></select></label>
+        <p class="form-note">DropWise will space each reminder evenly across the day.</p>
+        <button class="primary-button" value="default">Add to my routine</button>
+      </form>
+    </dialog>
+
+    <dialog id="helpDialog">
+      <div class="dialog-header"><div><p class="eyebrow">ABOUT DROPWISE</p><h2>Designed for clearer routines</h2></div><button class="icon-button" id="closeHelp" aria-label="Close">×</button></div>
+      <p>DropWise is a student prototype that helps people remember eye-drop routines. It is not medical advice—always follow your clinician’s instructions.</p>
+      <button class="primary-button" id="closeHelpButton">Got it</button>
+    </dialog>
+    <div id="toast" role="status" aria-live="polite"></div>
+    <script src="app.js"></script>
+  </body>
+</html>

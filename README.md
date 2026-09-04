@@ -1,19 +1,23 @@
-# DropWise
+# ClearCue
 
 An original eye-drop routine prototype for a Congressional App Challenge project.
 
-## Run it
+## Browser prototype
 
 Open `index.html` in a modern browser. No account, server, or installation is required.
 
-## Included in this first prototype
+## iPhone-first mobile prototype
 
-- Large, color-coded daily-dose cards
-- Left/right/both-eye instructions
-- Completion tracking saved in browser storage
-- Add-drop flow with evenly distributed daily reminders
-- Accessible, mobile-first layout and medical-safety reminder
+The native mobile project is in [`mobile/`](mobile). To run it on an iPhone:
 
-## Next milestone
+1. Install **Expo Go** from the App Store and connect the phone and computer to the same Wi-Fi network.
+2. In a terminal, run `cd mobile` followed by `npm start`.
+3. Scan the QR code shown in the terminal with your iPhone camera, then open the link in Expo Go.
 
-Convert this into a React Native/Expo app and add real device notifications, history, and a carefully reviewed accessibility/caregiver mode.
+The mobile app currently includes the ClearCue dashboard, color- and eye-specific medication cards, completion tracking for the active session, and an add-medication flow.
+
+## Next mobile milestone
+
+- Save routines and adherence history securely on-device
+- Add safe reminder spacing and real local notifications
+- Add an accessibility and caregiver mode

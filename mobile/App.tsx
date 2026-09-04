@@ -16,6 +16,7 @@ const STARTING_DOSES: Dose[] = [
 const COLORS = ['#35A7D9', '#E88C3A', '#876CC4', '#25A77B', '#DE5D6A'];
 const STORAGE_KEY = 'clearcue-doses-v1';
 const HISTORY_KEY = 'clearcue-adherence-v1';
+const TRACKING_START_KEY = 'clearcue-tracking-start-v1';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({ shouldPlaySound: true, shouldSetBadge: false, shouldShowBanner: true, shouldShowList: true }),
@@ -55,6 +56,7 @@ export default function App() {
   const [remindersEnabled, setRemindersEnabled] = useState(false);
   const [history, setHistory] = useState<DoseLog[]>([]);
   const [showInsights, setShowInsights] = useState(false);
+  const [trackingStart, setTrackingStart] = useState(dateKey(new Date()));
   useEffect(() => {
     async function restoreRoutine() {
       try {
@@ -64,6 +66,8 @@ export default function App() {
         const savedHistory = await AsyncStorage.getItem(HISTORY_KEY);
         if (savedHistory) setHistory(JSON.parse(savedHistory) as DoseLog[]);
         else setHistory(restoredDoses.filter((dose) => dose.completed).map((dose) => ({ doseId: dose.id, date: dateKey(new Date()), status: 'taken' as const, completedAt: new Date().toISOString() })));
+        const savedTrackingStart = await AsyncStorage.getItem(TRACKING_START_KEY);
+        if (savedTrackingStart) setTrackingStart(savedTrackingStart);
         const scheduled = await Notifications.getAllScheduledNotificationsAsync();
         setRemindersEnabled(scheduled.length > 0);
       } catch {
@@ -74,10 +78,11 @@ export default function App() {
   }, []);
   useEffect(() => { if (hydrated) AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(doses)); }, [doses, hydrated]);
   useEffect(() => { if (hydrated) AsyncStorage.setItem(HISTORY_KEY, JSON.stringify(history)); }, [history, hydrated]);
+  useEffect(() => { if (hydrated) AsyncStorage.setItem(TRACKING_START_KEY, trackingStart); }, [trackingStart, hydrated]);
   useEffect(() => { if (hydrated && remindersEnabled) void scheduleReminders(doses); }, [doses, hydrated, remindersEnabled]);
   const complete = doses.filter((dose) => dose.completed).length; const percentage = doses.length ? Math.round((complete / doses.length) * 100) : 0;
   const progress = useMemo(() => `${complete} of ${doses.length} completed`, [complete, doses.length]);
-  const adherence = useMemo(() => buildAdherence(doses, history), [doses, history]);
+  const adherence = useMemo(() => buildAdherence(doses, history, trackingStart), [doses, history, trackingStart]);
   function toggleDose(id: string) {
     const dose = doses.find((item) => item.id === id); if (!dose) return;
     const isCompleting = !dose.completed; const today = dateKey(new Date());
@@ -114,17 +119,17 @@ export default function App() {
 function DoseCard({ dose, onToggle }: { dose: Dose; onToggle: () => void }) { return <View style={[styles.doseCard, dose.completed && styles.completedCard]}><View style={[styles.colorDot, { backgroundColor: dose.color }]} /><View style={styles.doseInfo}><Text style={styles.doseName}>{dose.name}</Text><Text style={styles.doseDetails}>{dose.eye} · Label color</Text></View><View style={styles.doseAction}><Text style={styles.time}>{dose.time}</Text><Pressable onPress={onToggle} style={[styles.doneButton, dose.completed && styles.checkedButton]}><Text style={styles.doneText}>{dose.completed ? '✓' : 'Done'}</Text></Pressable></View></View>; }
 type DaySummary = { date: string; label: string; statuses: AdherenceStatus[] };
 type AdherenceData = { days: DaySummary[]; expected: number; taken: number; late: number; missed: number; streak: number; byMedication: { name: string; color: string; percent: number; taken: number; expected: number }[]; insight: string };
-function buildAdherence(doses: Dose[], history: DoseLog[]): AdherenceData {
+function buildAdherence(doses: Dose[], history: DoseLog[], trackingStart: string): AdherenceData {
   const now = new Date(); const days: DaySummary[] = [];
   for (let offset = 6; offset >= 0; offset--) {
     const current = new Date(now); current.setHours(0, 0, 0, 0); current.setDate(current.getDate() - offset); const key = dateKey(current); const statuses: AdherenceStatus[] = [];
-    doses.forEach((dose) => { const log = history.find((item) => item.date === key && item.doseId === dose.id); const due = scheduledDate(key, dose.time); if (log) statuses.push(log.status); else if (due && due.getTime() <= now.getTime()) statuses.push('missed'); });
+    doses.forEach((dose) => { const log = history.find((item) => item.date === key && item.doseId === dose.id); const due = scheduledDate(key, dose.time); if (log) statuses.push(log.status); else if (key >= trackingStart && due && due.getTime() <= now.getTime()) statuses.push('missed'); });
     days.push({ date: key, label: current.toLocaleDateString('en-US', { weekday: 'narrow' }), statuses });
   }
   const statuses = days.flatMap((day) => day.statuses); const taken = statuses.filter((status) => status === 'taken').length; const late = statuses.filter((status) => status === 'late').length; const missed = statuses.filter((status) => status === 'missed').length; const expected = statuses.length;
   let streak = 0; for (const day of [...days].reverse()) { if (day.statuses.length === doses.length && day.statuses.every((status) => status !== 'missed')) streak++; else if (day.statuses.length === doses.length) break; }
-  const byMedication = doses.map((dose) => { const doseStatuses: AdherenceStatus[] = []; days.forEach((day) => { const log = history.find((item) => item.date === day.date && item.doseId === dose.id); const due = scheduledDate(day.date, dose.time); if (log) doseStatuses.push(log.status); else if (due && due.getTime() <= now.getTime()) doseStatuses.push('missed'); }); const doseTaken = doseStatuses.filter((status) => status !== 'missed').length; return { name: dose.name, color: dose.color, percent: doseStatuses.length ? Math.round((doseTaken / doseStatuses.length) * 100) : 0, taken: doseTaken, expected: doseStatuses.length }; });
-  const periods = ['morning', 'afternoon', 'evening'].map((period) => { const periodDoses = doses.filter((dose) => timePeriod(dose.time) === period); let periodExpected = 0; let periodMissed = 0; periodDoses.forEach((dose) => { days.forEach((day) => { const log = history.find((item) => item.date === day.date && item.doseId === dose.id); const due = scheduledDate(day.date, dose.time); if (log || (due && due.getTime() <= now.getTime())) { periodExpected++; if (!log) periodMissed++; } }); }); return { period, expected: periodExpected, missed: periodMissed, rate: periodExpected ? periodMissed / periodExpected : 0 }; }).filter((item) => item.expected > 0);
+  const byMedication = doses.map((dose) => { const doseStatuses: AdherenceStatus[] = []; days.forEach((day) => { const log = history.find((item) => item.date === day.date && item.doseId === dose.id); const due = scheduledDate(day.date, dose.time); if (log) doseStatuses.push(log.status); else if (day.date >= trackingStart && due && due.getTime() <= now.getTime()) doseStatuses.push('missed'); }); const doseTaken = doseStatuses.filter((status) => status !== 'missed').length; return { name: dose.name, color: dose.color, percent: doseStatuses.length ? Math.round((doseTaken / doseStatuses.length) * 100) : 0, taken: doseTaken, expected: doseStatuses.length }; });
+  const periods = ['morning', 'afternoon', 'evening'].map((period) => { const periodDoses = doses.filter((dose) => timePeriod(dose.time) === period); let periodExpected = 0; let periodMissed = 0; periodDoses.forEach((dose) => { days.forEach((day) => { const log = history.find((item) => item.date === day.date && item.doseId === dose.id); const due = scheduledDate(day.date, dose.time); if (log || (day.date >= trackingStart && due && due.getTime() <= now.getTime())) { periodExpected++; if (!log) periodMissed++; } }); }); return { period, expected: periodExpected, missed: periodMissed, rate: periodExpected ? periodMissed / periodExpected : 0 }; }).filter((item) => item.expected > 0);
   const highest = [...periods].sort((a, b) => b.rate - a.rate)[0]; const others = periods.filter((item) => item !== highest); const otherRate = others.length ? others.reduce((sum, item) => sum + item.rate, 0) / others.length : 0;
   const insight = !expected ? 'Complete a few doses to unlock your first adherence insight.' : !missed ? 'Excellent consistency—no missed doses in the tracked period.' : highest && otherRate > 0 ? `You miss ${highest.period} doses ${(highest.rate / otherRate).toFixed(1)}× more often than other times.` : `Most missed doses are in the ${highest?.period ?? 'tracked'} period.`;
   return { days, expected, taken, late, missed, streak, byMedication, insight };

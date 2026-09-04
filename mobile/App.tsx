@@ -1,5 +1,6 @@
 import { StatusBar } from 'expo-status-bar';
-import { useMemo, useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useEffect, useMemo, useState } from 'react';
 import { Alert, Modal, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 type Eye = 'Left eye' | 'Right eye' | 'Both eyes';
@@ -10,10 +11,24 @@ const STARTING_DOSES: Dose[] = [
   { id: '3', name: 'Artificial Tears', eye: 'Both eyes', color: '#876CC4', time: '1:00 PM', completed: false },
 ];
 const COLORS = ['#35A7D9', '#E88C3A', '#876CC4', '#25A77B', '#DE5D6A'];
+const STORAGE_KEY = 'clearcue-doses-v1';
 
 export default function App() {
   const [doses, setDoses] = useState(STARTING_DOSES); const [modalOpen, setModalOpen] = useState(false);
   const [name, setName] = useState(''); const [time, setTime] = useState('9:00 AM'); const [eye, setEye] = useState<Eye>('Right eye'); const [color, setColor] = useState(COLORS[0]);
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => {
+    async function restoreRoutine() {
+      try {
+        const saved = await AsyncStorage.getItem(STORAGE_KEY);
+        if (saved) setDoses(JSON.parse(saved) as Dose[]);
+      } catch {
+        Alert.alert('Could not restore saved routine', 'ClearCue will continue with the current routine.');
+      } finally { setHydrated(true); }
+    }
+    restoreRoutine();
+  }, []);
+  useEffect(() => { if (hydrated) AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(doses)); }, [doses, hydrated]);
   const complete = doses.filter((dose) => dose.completed).length; const percentage = doses.length ? Math.round((complete / doses.length) * 100) : 0;
   const progress = useMemo(() => `${complete} of ${doses.length} completed`, [complete, doses.length]);
   function toggleDose(id: string) { setDoses((current) => current.map((dose) => dose.id === id ? { ...dose, completed: !dose.completed } : dose)); }
@@ -26,7 +41,7 @@ export default function App() {
     <View style={styles.topbar}><View style={styles.brandRow}><View style={styles.logo}><Text style={styles.logoText}>◒</Text></View><Text style={styles.brand}>ClearCue</Text></View><Pressable accessibilityLabel="About ClearCue" onPress={() => Alert.alert('About ClearCue', 'ClearCue helps you follow an eye-drop prescription. It does not replace guidance from your clinician.')} style={styles.help}><Text style={styles.helpText}>?</Text></Pressable></View>
     <Text style={styles.date}>TODAY</Text><Text style={styles.greeting}>Good morning.</Text><Text style={styles.subheading}>Your eye-care routine, made easier.</Text>
     <View style={styles.progressCard}><View><Text style={styles.cardLabel}>TODAY’S ROUTINE</Text><Text style={styles.progressText}>{progress}</Text></View><View style={styles.progressCircle}><View style={styles.progressInner}><Text style={styles.progressNumber}>{percentage}%</Text></View></View></View>
-    <View style={styles.sectionHeader}><View><Text style={styles.sectionLabel}>UP NEXT</Text><Text style={styles.sectionTitle}>Today’s schedule</Text></View><Pressable onPress={() => Alert.alert('History', 'Dose history will be saved on your device in the next milestone.')}><Text style={styles.history}>History</Text></Pressable></View>
+    <View style={styles.sectionHeader}><View><Text style={styles.sectionLabel}>UP NEXT</Text><Text style={styles.sectionTitle}>Today’s schedule</Text></View><Pressable onPress={() => Alert.alert('Saved on this iPhone', 'Your medication routine and completed doses are saved locally on this device.')}><Text style={styles.history}>Saved</Text></Pressable></View>
     <View style={styles.list}>{doses.map((dose) => <DoseCard key={dose.id} dose={dose} onToggle={() => toggleDose(dose.id)} />)}</View>
     <View style={styles.tip}><Text style={styles.tipIcon}>✦</Text><View style={styles.tipContent}><Text style={styles.tipTitle}>Spacing matters</Text><Text style={styles.tipText}>Leave at least 5 minutes between different drops in the same eye.</Text></View></View>
   </ScrollView><Pressable style={styles.addButton} onPress={() => setModalOpen(true)} accessibilityLabel="Add eye drop"><Text style={styles.addPlus}>＋</Text><Text style={styles.addText}>Add eye drop</Text></Pressable>

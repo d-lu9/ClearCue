@@ -14,10 +14,10 @@ The native mobile project is in [`mobile/`](mobile). To run it on an iPhone:
 2. In a terminal, run `cd mobile` followed by `npm start`.
 3. Scan the QR code shown in the terminal with your iPhone camera, then open the link in Expo Go.
 
-The mobile app currently includes the ClearCue dashboard, color- and eye-specific medication cards, completion tracking for the active session, and an add-medication flow.
+The mobile app currently includes the ClearCue dashboard, color- and eye-specific medication cards, on-device routine storage, completion tracking, an add-medication flow, and opt-in daily local notifications.
 
 ## Next mobile milestone
 
-- Save routines and adherence history securely on-device
-- Add safe reminder spacing and real local notifications
+- Add adherence history and optional daily reset behavior
+- Add safe reminder spacing when new prescriptions are added
 - Add an accessibility and caregiver mode

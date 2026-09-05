@@ -4,7 +4,12 @@
     "slug": "clearcue",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/clearcue-icon.png",
+    "splash": {
+      "image": "./assets/clearcue-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#FAF7F2"
+    },
     "userInterfaceStyle": "light",
     "plugins": ["expo-notifications"],
     "ios": {

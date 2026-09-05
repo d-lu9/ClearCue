@@ -2,8 +2,8 @@ import { StatusBar } from 'expo-status-bar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 import { CatalogMedication, searchMedications } from './data/medications';
-import { useEffect, useMemo, useState } from 'react';
-import { AccessibilityInfo, Alert, AppState, Modal, Pressable, SafeAreaView, ScrollView, Share, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { AccessibilityInfo, Alert, Animated, AppState, Image, Modal, Pressable, SafeAreaView, ScrollView, Share, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 
 type Eye = 'Left eye' | 'Right eye' | 'Both eyes';
 type Supply = { bottleMl: number; dropsPerApplication: number; applicationsPerDay: number; openedOn: string; warningDays: number; dropsPerMl: number };
@@ -90,6 +90,10 @@ const extraStyles = StyleSheet.create({
   emptyTitle: { color: '#3A302B', fontSize: 20, fontWeight: '800', marginTop: 4 },
   emptyText: { color: '#6F625B', fontSize: 13, lineHeight: 19, textAlign: 'center', marginBottom: 5 },
   emptyGuide: { paddingVertical: 7 },
+  splashScreen: { position: 'absolute', inset: 0, zIndex: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FAF7F2' },
+  splashIcon: { width: 124, height: 124, borderRadius: 28 },
+  splashTitle: { color: '#B85C4A', fontSize: 29, fontWeight: '800', letterSpacing: -0.7, marginTop: 18 },
+  splashSubtitle: { color: '#6F625B', fontSize: 14, marginTop: 6 },
 });
 
 function parseReminderTime(value: string) {
@@ -161,6 +165,11 @@ export default function App() {
   const [guideOpen, setGuideOpen] = useState(false);
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [onboardingVisible, setOnboardingVisible] = useState(false); const [onboardingStep, setOnboardingStep] = useState(0);
+  const [launching, setLaunching] = useState(true); const splashOpacity = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    const timer = setTimeout(() => Animated.timing(splashOpacity, { toValue: 0, duration: 360, useNativeDriver: true }).start(() => setLaunching(false)), 700);
+    return () => clearTimeout(timer);
+  }, [splashOpacity]);
   useEffect(() => {
     async function restoreRoutine() {
       try {
@@ -256,6 +265,7 @@ export default function App() {
     <View style={[styles.tip, settings.highContrast && styles.highContrastSoftCard]}><Text style={styles.tipIcon}>✦</Text><View style={styles.tipContent}><Text style={[styles.tipTitle, scaleText]}>{copy.spacing}</Text><Text style={[styles.tipText, scaleText]}>{copy.spacingDetail}</Text></View></View>
   </ScrollView><Pressable accessibilityRole="button" style={styles.addButton} onPress={startAddingDose} accessibilityLabel={copy.add} accessibilityHint="Opens a form to add an eye-drop reminder"><Text style={styles.addPlus}>＋</Text><Text style={[styles.addText, scaleText]}>{copy.add}</Text></Pressable>
   <AddMedicationModal visible={modalOpen} animation={settings.reduceMotion ? 'none' : 'slide'} isEditing={Boolean(editingDoseId)} name={name} time={time} eye={eye} color={color} clinicianInstructions={taperPlan} prescriber={prescriber} pharmacy={pharmacy} rxNumber={rxNumber} personalNotes={personalNotes} bottleMl={bottleMl} dropsPerApplication={dropsPerApplication} applicationsPerDay={applicationsPerDay} openedOn={openedOn} warningDays={warningDays} selectedMedication={selectedMedication} onName={(value) => { setName(value); setSelectedMedication(null); }} onSelectMedication={(medication) => { setSelectedMedication(medication); setName(medication.genericName); }} onTime={setTime} onClinicianInstructions={setTaperPlan} onPrescriber={setPrescriber} onPharmacy={setPharmacy} onRxNumber={setRxNumber} onPersonalNotes={setPersonalNotes} onBottleMl={setBottleMl} onDropsPerApplication={setDropsPerApplication} onApplicationsPerDay={setApplicationsPerDay} onOpenedOn={setOpenedOn} onWarningDays={setWarningDays} onEye={setEye} onColor={setColor} onClose={() => setModalOpen(false)} onSave={saveDose} onDelete={deleteEditingDose} /></SafeAreaView>
+  {launching && <Animated.View accessible accessibilityLabel="ClearCue is loading" style={[extraStyles.splashScreen, { opacity: splashOpacity }]}><Image source={require('./assets/clearcue-icon.png')} style={extraStyles.splashIcon} /><Text style={extraStyles.splashTitle}>ClearCue</Text><Text style={extraStyles.splashSubtitle}>Clearer routines, one drop at a time.</Text></Animated.View>}
   <DoctorReportModal visible={reportOpen} animation={settings.reduceMotion ? 'none' : 'slide'} days={reportDays} data={reportData} onDays={setReportDays} onClose={() => setReportOpen(false)} /><DoseHistoryModal visible={historyDose !== null} animation={settings.reduceMotion ? 'none' : 'slide'} dose={historyDose} history={history} trackingStart={trackingStart} onClose={() => setHistoryDoseId(null)} /><PrivacyModal visible={privacyOpen} animation={settings.reduceMotion ? 'none' : 'slide'} hideNotificationDetails={settings.hideNotificationDetails} onHideNotificationDetails={(value) => setSettings((current) => ({ ...current, hideNotificationDetails: value }))} onErase={() => { Alert.alert('Erase routine data?', 'This permanently removes medications, private prescription details, and adherence history from this device. Accessibility settings will stay.', [{ text: 'Cancel', style: 'cancel' }, { text: 'Erase data', style: 'destructive', onPress: () => { void AsyncStorage.multiRemove([STORAGE_KEY, HISTORY_KEY, TRACKING_START_KEY]); void Notifications.cancelAllScheduledNotificationsAsync(); setDoses([]); setHistory([]); setTrackingStart(dateKey(new Date())); setRemindersEnabled(false); setPrivacyOpen(false); } }]); }} onClose={() => setPrivacyOpen(false)} /><SettingsModal visible={settingsOpen} animation={settings.reduceMotion ? 'none' : 'slide'} settings={settings} onChange={setSettings} onClose={() => setSettingsOpen(false)} /><DropGuideModal visible={guideOpen} animation={settings.reduceMotion ? 'none' : 'slide'} onClose={() => setGuideOpen(false)} /><OnboardingModal visible={onboardingVisible} animation={settings.reduceMotion ? 'none' : 'slide'} step={onboardingStep} onNext={() => setOnboardingStep((current) => Math.min(current + 1, 2))} onComplete={() => { setOnboardingVisible(false); setOnboardingStep(0); void AsyncStorage.setItem(ONBOARDING_KEY, 'complete'); }} /></>;
 }
 function EmptyRoutine({ onAdd, onGuide }: { onAdd: () => void; onGuide: () => void }) { return <View accessible accessibilityLabel="Your routine is empty. Add your first eye drop to begin." style={extraStyles.emptyRoutine}><View style={extraStyles.emptyIcon}><Text style={extraStyles.emptyIconText}>◒</Text></View><Text style={extraStyles.emptyTitle}>Start your routine</Text><Text style={extraStyles.emptyText}>Add an eye drop to create reminders, track progress, and build a shareable report.</Text><Pressable accessibilityRole="button" accessibilityLabel="Add your first eye drop" onPress={onAdd} style={styles.saveButton}><Text style={styles.saveText}>Add first eye drop</Text></Pressable><Pressable accessibilityRole="button" accessibilityLabel="Open how to use eye drops guide" onPress={onGuide} style={extraStyles.emptyGuide}><Text style={extraStyles.cardLink}>How to use eye drops</Text></Pressable></View>; }

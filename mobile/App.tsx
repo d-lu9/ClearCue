@@ -19,6 +19,7 @@ const STARTING_DOSES: Dose[] = [
   { id: '3', name: 'Artificial Tears', eye: 'Both eyes', color: '#876CC4', time: '1:00 PM', completed: false },
 ];
 const COLORS = ['#35A7D9', '#E88C3A', '#876CC4', '#25A77B', '#DE5D6A'];
+const TIME_OPTIONS = ['6:00 AM', '7:00 AM', '8:00 AM', '9:00 AM', '10:00 AM', '11:00 AM', '12:00 PM', '1:00 PM', '2:00 PM', '3:00 PM', '4:00 PM', '5:00 PM', '6:00 PM', '7:00 PM', '8:00 PM', '9:00 PM', '10:00 PM'];
 const STORAGE_KEY = 'clearcue-doses-v1';
 const HISTORY_KEY = 'clearcue-adherence-v1';
 const TRACKING_START_KEY = 'clearcue-tracking-start-v1';
@@ -43,6 +44,15 @@ const extraStyles = StyleSheet.create({
   supplyFootnote: { color: '#6F625B', fontSize: 11, lineHeight: 16, marginTop: -4 },
   supplyStatus: { fontSize: 11, fontWeight: '800', color: '#557A66', marginTop: 5 },
   supplyWarning: { color: '#B36A18' },
+  timePickerButton: { height: 50, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E7DDD4', borderRadius: 12, paddingHorizontal: 13, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  timePickerValue: { color: '#3A302B', fontSize: 16, fontWeight: '700' },
+  timePickerArrow: { color: '#B85C4A', fontSize: 18, fontWeight: '800' },
+  timeMenu: { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E7DDD4', borderRadius: 13, padding: 8, gap: 7 },
+  timeMenuGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
+  timeOption: { width: '31%', borderRadius: 9, paddingVertical: 9, alignItems: 'center', backgroundColor: '#FAF7F2' },
+  timeOptionSelected: { backgroundColor: '#F5E5D8', borderWidth: 1, borderColor: '#B85C4A' },
+  timeOptionText: { color: '#6F625B', fontSize: 12, fontWeight: '800' },
+  timeOptionTextSelected: { color: '#B85C4A' },
   lensEye: { backgroundColor: '#FFFFFF', borderRadius: 14, padding: 14, gap: 14, borderWidth: 1, borderColor: '#E7DDD4' },
   lensEyeTitle: { color: '#3A302B', fontSize: 15, fontWeight: '800' },
   lensClear: { alignItems: 'center', paddingVertical: 9 },
@@ -407,6 +417,8 @@ function SettingRow({ title, detail, value, onChange }: { title: string; detail:
 type ModalProps = { visible: boolean; animation: 'none' | 'slide'; isEditing: boolean; name: string; time: string; eye: Eye; color: string; clinicianInstructions: string; prescriber: string; pharmacy: string; rxNumber: string; personalNotes: string; bottleMl: string; dropsPerApplication: string; applicationsPerDay: string; openedOn: string; warningDays: string; selectedMedication: CatalogMedication | null; onName: (v: string) => void; onSelectMedication: (medication: CatalogMedication) => void; onTime: (v: string) => void; onClinicianInstructions: (v: string) => void; onPrescriber: (v: string) => void; onPharmacy: (v: string) => void; onRxNumber: (v: string) => void; onPersonalNotes: (v: string) => void; onBottleMl: (v: string) => void; onDropsPerApplication: (v: string) => void; onApplicationsPerDay: (v: string) => void; onOpenedOn: (v: string) => void; onWarningDays: (v: string) => void; onEye: (v: Eye) => void; onColor: (v: string) => void; onClose: () => void; onSave: () => void; onDelete: () => void };
 function AddMedicationModal(props: ModalProps) {
   const suggestions = searchMedications(props.name);
+  const [timeMenuOpen, setTimeMenuOpen] = useState(false);
+  useEffect(() => { if (!props.visible) setTimeMenuOpen(false); }, [props.visible]);
   return (
     <Modal visible={props.visible} animationType={props.animation} presentationStyle="pageSheet" onRequestClose={props.onClose}>
       <SafeAreaView style={styles.modalScreen}>
@@ -415,7 +427,7 @@ function AddMedicationModal(props: ModalProps) {
           <Field label="Search eye medications"><TextInput accessibilityLabel="Search eye medications" value={props.name} onChangeText={props.onName} placeholder="Generic or brand name" placeholderTextColor="#81969A" style={styles.input} /></Field>
           <View style={{ gap: 8, marginTop: -12 }}>{suggestions.map((medication) => <Pressable accessibilityRole="button" accessibilityLabel={`Choose ${medication.genericName}`} key={medication.id} onPress={() => props.onSelectMedication(medication)} style={{ padding: 12, borderRadius: 12, borderWidth: 1, borderColor: props.selectedMedication?.id === medication.id ? '#B85C4A' : '#E7DDD4', backgroundColor: props.selectedMedication?.id === medication.id ? '#F5E5D8' : '#FFFFFF' }}><Text style={{ fontSize: 14, fontWeight: '800', color: '#3A302B' }}>{medication.genericName}</Text><Text style={{ fontSize: 11, color: '#6F625B', marginTop: 3 }}>{medication.brandNames.join(' · ')} · {medication.category}</Text></Pressable>)}</View>
           {props.selectedMedication && <View style={{ backgroundColor: '#F5E5D8', borderRadius: 14, padding: 14, marginTop: -12 }}><Text style={{ fontSize: 14, fontWeight: '800', color: '#3A302B' }}>{props.selectedMedication.genericName}</Text><Text style={{ fontSize: 12, fontWeight: '700', color: '#B85C4A', marginTop: 3 }}>{props.selectedMedication.category} · {props.selectedMedication.form}</Text><Text style={{ fontSize: 12, color: '#6F625B', lineHeight: 17, marginTop: 5 }}>{props.selectedMedication.commonUse}</Text><Text style={{ fontSize: 11, color: '#704D30', lineHeight: 16, marginTop: 8 }}>Use the instructions on your prescription label and from your clinician. ClearCue does not provide dosing directions.</Text><Text style={{ fontSize: 10, color: '#6F625B', marginTop: 7 }}>{props.selectedMedication.prescriptionStatus ?? (props.selectedMedication.id === 'artificial-tears' ? 'Over-the-counter' : 'Prescription')} reference · {props.selectedMedication.source} · reviewed {props.selectedMedication.reviewedOn}</Text></View>}
-          <Field label="Reminder time"><TextInput accessibilityLabel="Reminder time" value={props.time} onChangeText={props.onTime} placeholder="e.g. 8:00 AM" placeholderTextColor="#81969A" style={styles.input} /></Field>
+          <TimePicker value={props.time} open={timeMenuOpen} onToggle={() => setTimeMenuOpen((current) => !current)} onChange={(value) => { props.onTime(value); setTimeMenuOpen(false); }} />
           <Field label="Clinician application instructions (optional)"><TextInput accessibilityLabel="Clinician application instructions" value={props.clinicianInstructions} onChangeText={props.onClinicianInstructions} placeholder="Copy the instructions from your clinician or prescription label" placeholderTextColor="#81969A" multiline style={[styles.input, { height: 78, paddingTop: 12, textAlignVertical: 'top' }]} /></Field>
           <View style={extraStyles.detailsSection}><Text style={styles.fieldLabel}>Private prescription details (optional)</Text><Text style={extraStyles.supplyHelp}>Stored only on this device. These details are never used to change a medication schedule.</Text><Field label="Prescriber"><TextInput accessibilityLabel="Prescriber name" value={props.prescriber} onChangeText={props.onPrescriber} placeholder="e.g. Dr. Rivera" placeholderTextColor="#81969A" style={styles.input} /></Field><Field label="Pharmacy"><TextInput accessibilityLabel="Pharmacy name" value={props.pharmacy} onChangeText={props.onPharmacy} placeholder="e.g. Main Street Pharmacy" placeholderTextColor="#81969A" style={styles.input} /></Field><Field label="Prescription number"><TextInput accessibilityLabel="Prescription number" value={props.rxNumber} onChangeText={props.onRxNumber} placeholder="Optional" placeholderTextColor="#81969A" style={styles.input} /></Field><Field label="Personal note"><TextInput accessibilityLabel="Personal medication note" value={props.personalNotes} onChangeText={props.onPersonalNotes} placeholder="Optional reminder for yourself" placeholderTextColor="#81969A" multiline style={[styles.input, { height: 70, paddingTop: 12, textAlignVertical: 'top' }]} /></Field></View>
           <View style={styles.note}><Text style={styles.noteTitle}>ClearCue supports your plan</Text><Text style={styles.noteText}>ClearCue does not diagnose, prescribe, change a dose, or replace your clinician’s instructions or prescription label.</Text></View>
@@ -429,6 +441,9 @@ function AddMedicationModal(props: ModalProps) {
       </SafeAreaView>
     </Modal>
   );
+}
+function TimePicker({ value, open, onToggle, onChange }: { value: string; open: boolean; onToggle: () => void; onChange: (value: string) => void }) {
+  return <Field label="Reminder time"><Pressable accessibilityRole="button" accessibilityState={{ expanded: open }} accessibilityLabel={`Reminder time: ${value}. Open time menu`} accessibilityHint="Choose a common reminder time or enter a custom time" onPress={onToggle} style={extraStyles.timePickerButton}><Text style={extraStyles.timePickerValue}>{value || 'Select a time'}</Text><Text style={extraStyles.timePickerArrow}>{open ? '⌃' : '⌄'}</Text></Pressable>{open && <View style={extraStyles.timeMenu}><Text style={extraStyles.supplyHelp}>Choose a common time</Text><View style={extraStyles.timeMenuGrid}>{TIME_OPTIONS.map((option) => <Pressable accessibilityRole="radio" accessibilityState={{ selected: value === option }} accessibilityLabel={option} key={option} onPress={() => onChange(option)} style={[extraStyles.timeOption, value === option && extraStyles.timeOptionSelected]}><Text style={[extraStyles.timeOptionText, value === option && extraStyles.timeOptionTextSelected]}>{option}</Text></Pressable>)}</View><Text style={[styles.fieldLabel, { marginTop: 5 }]}>Or enter a custom time</Text><TextInput accessibilityLabel="Custom reminder time" value={value} onChangeText={onChange} placeholder="e.g. 8:30 AM" placeholderTextColor="#81969A" style={styles.input} /><Text style={extraStyles.supplyHelp}>Use a time like 8:30 AM. Your iPhone reminder will use this exact time.</Text></View>}</Field>;
 }
 function Field({ label, children }: { label: string; children: React.ReactNode }) { return <View><Text style={styles.fieldLabel}>{label}</Text>{children}</View>; }
 const styles = StyleSheet.create({

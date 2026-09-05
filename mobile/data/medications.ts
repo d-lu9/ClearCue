@@ -7,6 +7,8 @@ export type CatalogMedication = {
   form: string;
   source: string;
   reviewedOn: string;
+  prescriptionStatus?: 'Prescription' | 'Over-the-counter';
+  aliases?: string[];
 };
 
 // Starter catalog only. Product packaging and label colors vary by manufacturer.
@@ -25,11 +27,18 @@ export const MEDICATIONS: CatalogMedication[] = [
   { id: 'lifitegrast', genericName: 'Lifitegrast', brandNames: ['Xiidra'], category: 'LFA-1 antagonist', commonUse: 'Used for clinician-directed dry-eye treatment', form: 'Ophthalmic solution', source: 'RxNorm / DailyMed', reviewedOn: '2026-09-05' },
   { id: 'olopatadine', genericName: 'Olopatadine hydrochloride', brandNames: ['Patanol', 'Pataday'], category: 'Antihistamine', commonUse: 'Used for eye-allergy symptom treatment', form: 'Ophthalmic solution', source: 'RxNorm / DailyMed', reviewedOn: '2026-09-05' },
   { id: 'pilocarpine', genericName: 'Pilocarpine hydrochloride', brandNames: ['Pilocar'], category: 'Miotic', commonUse: 'Used for clinician-directed eye-pressure treatment', form: 'Ophthalmic solution', source: 'RxNorm / DailyMed', reviewedOn: '2026-09-05' },
+  { id: 'bimatoprost', genericName: 'Bimatoprost', brandNames: ['Lumigan'], aliases: ['bimatoprost ophthalmic'], category: 'Prostaglandin analog', commonUse: 'Helps lower eye pressure', form: 'Ophthalmic solution', prescriptionStatus: 'Prescription', source: 'RxNorm / DailyMed', reviewedOn: '2026-09-05' },
+  { id: 'travoprost', genericName: 'Travoprost', brandNames: ['Travatan Z'], aliases: ['travoprost ophthalmic'], category: 'Prostaglandin analog', commonUse: 'Helps lower eye pressure', form: 'Ophthalmic solution', prescriptionStatus: 'Prescription', source: 'RxNorm / DailyMed', reviewedOn: '2026-09-05' },
+  { id: 'tafluprost', genericName: 'Tafluprost', brandNames: ['Zioptan'], aliases: ['tafluprost ophthalmic'], category: 'Prostaglandin analog', commonUse: 'Helps lower eye pressure', form: 'Ophthalmic solution, single-dose containers', prescriptionStatus: 'Prescription', source: 'RxNorm / DailyMed', reviewedOn: '2026-09-05' },
+  { id: 'netarsudil', genericName: 'Netarsudil', brandNames: ['Rhopressa'], aliases: ['netarsudil ophthalmic'], category: 'Rho kinase inhibitor', commonUse: 'Helps lower eye pressure', form: 'Ophthalmic solution', prescriptionStatus: 'Prescription', source: 'RxNorm / DailyMed', reviewedOn: '2026-09-05' },
+  { id: 'dorzolamide-timolol', genericName: 'Dorzolamide hydrochloride / timolol maleate', brandNames: ['Cosopt'], aliases: ['dorzolamide timolol', 'cosopt'], category: 'Combination pressure-lowering drop', commonUse: 'Helps lower eye pressure when clinician-directed', form: 'Ophthalmic solution', prescriptionStatus: 'Prescription', source: 'RxNorm / DailyMed', reviewedOn: '2026-09-05' },
+  { id: 'brimonidine-timolol', genericName: 'Brimonidine tartrate / timolol maleate', brandNames: ['Combigan'], aliases: ['brimonidine timolol', 'combigan'], category: 'Combination pressure-lowering drop', commonUse: 'Helps lower eye pressure when clinician-directed', form: 'Ophthalmic solution', prescriptionStatus: 'Prescription', source: 'RxNorm / DailyMed', reviewedOn: '2026-09-05' },
+  { id: 'loteprednol', genericName: 'Loteprednol etabonate', brandNames: ['Lotemax'], aliases: ['loteprednol ophthalmic'], category: 'Corticosteroid anti-inflammatory', commonUse: 'Used for clinician-directed eye inflammation treatment', form: 'Ophthalmic suspension, gel, or ointment', prescriptionStatus: 'Prescription', source: 'RxNorm / DailyMed', reviewedOn: '2026-09-05' },
   { id: 'artificial-tears', genericName: 'Artificial tears', brandNames: ['Refresh', 'Systane'], category: 'Lubricant', commonUse: 'Helps relieve dry-eye symptoms', form: 'Ophthalmic solution or gel', source: 'DailyMed / product label', reviewedOn: '2026-09-05' },
 ];
 
 export function searchMedications(query: string) {
   const normalized = query.trim().toLowerCase();
   if (!normalized) return MEDICATIONS.slice(0, 5);
-  return MEDICATIONS.filter((medication) => [medication.genericName, ...medication.brandNames].some((name) => name.toLowerCase().includes(normalized))).slice(0, 5);
+  return MEDICATIONS.filter((medication) => [medication.genericName, medication.category, medication.commonUse, ...medication.brandNames, ...(medication.aliases ?? [])].some((name) => name.toLowerCase().includes(normalized))).slice(0, 5);
 }

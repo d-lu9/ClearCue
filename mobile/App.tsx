@@ -3,7 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 import { CatalogMedication, MEDICATION_FILTERS, MedicationFilter, searchMedications } from './data/medications';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView as NativeSafeAreaView } from 'react-native-safe-area-context';
 import { AccessibilityInfo, Alert, Animated, AppState, Image, Modal, Pressable, ScrollView, Share, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 
 type Eye = 'Left eye' | 'Right eye' | 'Both eyes';
@@ -39,6 +39,15 @@ Notifications.setNotificationHandler({
 });
 
 const DOSE_REMINDER_CATEGORY = 'clearcue-dose-reminder';
+
+const sharedStyles = StyleSheet.create({
+  safeAreaBreathingRoom: { paddingTop: 16 },
+});
+
+function SafeAreaView({ style, ...props }: React.ComponentProps<typeof NativeSafeAreaView>) {
+  const needsHeaderGap = style !== extraStyles.onboardingScreen;
+  return <NativeSafeAreaView {...props} style={[style, needsHeaderGap && sharedStyles.safeAreaBreathingRoom]} />;
+}
 
 const extraStyles = StyleSheet.create({
   supplySection: { backgroundColor: '#EFF8F5', borderRadius: 14, padding: 14, gap: 14 },
@@ -234,6 +243,7 @@ export default function App() {
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [onboardingVisible, setOnboardingVisible] = useState(false); const [onboardingStep, setOnboardingStep] = useState(0);
   const [launching, setLaunching] = useState(true); const splashOpacity = useRef(new Animated.Value(1)).current;
+  const sawEmptyRoutine = useRef(false);
   useEffect(() => {
     const timer = setTimeout(() => Animated.timing(splashOpacity, { toValue: 0, duration: 360, useNativeDriver: true }).start(() => setLaunching(false)), 700);
     return () => clearTimeout(timer);
@@ -269,6 +279,15 @@ export default function App() {
     restoreRoutine();
   }, []);
   useEffect(() => { if (hydrated && !demoMode) AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(doses)); }, [doses, hydrated, demoMode]);
+  useEffect(() => {
+    if (!hydrated || demoMode) return;
+    if (doses.length === 0 && !sawEmptyRoutine.current) {
+      sawEmptyRoutine.current = true;
+      setOnboardingStep(0);
+      setOnboardingVisible(true);
+    }
+    if (doses.length > 0) sawEmptyRoutine.current = false;
+  }, [doses.length, hydrated, demoMode]);
   useEffect(() => { if (hydrated && !demoMode) AsyncStorage.setItem(HISTORY_KEY, JSON.stringify(history)); }, [history, hydrated, demoMode]);
   useEffect(() => { if (hydrated && !demoMode) AsyncStorage.setItem(TRACKING_START_KEY, trackingStart); }, [trackingStart, hydrated, demoMode]);
   useEffect(() => { if (hydrated && !demoMode) { if (contactLens) void AsyncStorage.setItem(CONTACT_LENS_KEY, JSON.stringify(contactLens)); else void AsyncStorage.removeItem(CONTACT_LENS_KEY); } }, [contactLens, hydrated, demoMode]);

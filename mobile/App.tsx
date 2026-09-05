@@ -1,7 +1,7 @@
 import { StatusBar } from 'expo-status-bar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
-import { CatalogMedication, searchMedications } from './data/medications';
+import { CatalogMedication, MEDICATION_FILTERS, MedicationFilter, searchMedications } from './data/medications';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AccessibilityInfo, Alert, Animated, AppState, Image, Modal, Pressable, ScrollView, Share, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
@@ -10,9 +10,9 @@ type Eye = 'Left eye' | 'Right eye' | 'Both eyes';
 type Supply = { bottleMl: number; dropsPerApplication: number; applicationsPerDay: number; openedOn: string; warningDays: number; dropsPerMl: number };
 type PrescriptionDetails = { prescriber?: string; pharmacy?: string; rxNumber?: string; notes?: string };
 type ContactLensPrescription = { brand: string; rightSphere: string; leftSphere: string; rightCylinder: string; leftCylinder: string; rightAxis: string; leftAxis: string; rightAdd: string; leftAdd: string; baseCurve: string; diameter: string; replacement: string; expiration: string; prescriber: string; pairsRemaining: string; reorderAt: string; notes: string };
-type Dose = { id: string; name: string; eye: Eye; color: string; time: string; completed: boolean; catalogId?: string; taperPlan?: string; supply?: Supply; prescription?: PrescriptionDetails };
+type Dose = { id: string; name: string; eye: Eye; color: string; time: string; completed: boolean; scheduleGroupId?: string; catalogId?: string; taperPlan?: string; supply?: Supply; prescription?: PrescriptionDetails };
 type AdherenceStatus = 'taken' | 'late' | 'missed';
-type DoseLog = { doseId: string; date: string; status: Exclude<AdherenceStatus, 'missed'>; completedAt: string };
+type DoseLog = { doseId: string; date: string; status: AdherenceStatus; completedAt?: string };
 type AppSettings = { largeText: boolean; highContrast: boolean; reduceMotion: boolean; hideNotificationDetails: boolean; language: 'en' | 'es' };
 const STARTING_DOSES: Dose[] = [
   { id: '1', name: 'Prednisolone Acetate', eye: 'Right eye', color: '#E88C3A', time: '8:00 AM', completed: false },
@@ -36,6 +36,8 @@ Notifications.setNotificationHandler({
   handleNotification: async () => ({ shouldPlaySound: true, shouldSetBadge: false, shouldShowBanner: true, shouldShowList: true }),
 });
 
+const DOSE_REMINDER_CATEGORY = 'clearcue-dose-reminder';
+
 const extraStyles = StyleSheet.create({
   supplySection: { backgroundColor: '#EFF8F5', borderRadius: 14, padding: 14, gap: 14 },
   detailsSection: { backgroundColor: '#FFFFFF', borderRadius: 14, padding: 14, gap: 14, borderWidth: 1, borderColor: '#E7DDD4' },
@@ -54,6 +56,17 @@ const extraStyles = StyleSheet.create({
   timeOptionSelected: { backgroundColor: '#F5E5D8', borderWidth: 1, borderColor: '#B85C4A' },
   timeOptionText: { color: '#6F625B', fontSize: 12, fontWeight: '800' },
   timeOptionTextSelected: { color: '#B85C4A' },
+  extraTimes: { backgroundColor: '#EFF8F5', borderRadius: 14, padding: 14, gap: 12 },
+  extraTimeRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+  removeTime: { width: 38, height: 50, marginTop: 21, borderRadius: 12, backgroundColor: '#FBE7E4', alignItems: 'center', justifyContent: 'center' },
+  removeTimeText: { color: '#B3362D', fontSize: 23, lineHeight: 25 },
+  addTime: { alignItems: 'center', borderWidth: 1, borderColor: '#B85C4A', borderRadius: 11, padding: 11, backgroundColor: '#FFFFFF' },
+  addTimeText: { color: '#B85C4A', fontSize: 13, fontWeight: '800' },
+  filterRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginTop: -13 },
+  filterChip: { borderWidth: 1, borderColor: '#E7DDD4', backgroundColor: '#FFFFFF', borderRadius: 16, paddingHorizontal: 10, paddingVertical: 7 },
+  filterChipSelected: { borderColor: '#B85C4A', backgroundColor: '#F5E5D8' },
+  filterChipText: { color: '#6F625B', fontSize: 11, fontWeight: '800' },
+  filterChipTextSelected: { color: '#B85C4A' },
   lensEye: { backgroundColor: '#FFFFFF', borderRadius: 14, padding: 14, gap: 14, borderWidth: 1, borderColor: '#E7DDD4' },
   lensEyeTitle: { color: '#3A302B', fontSize: 15, fontWeight: '800' },
   lensClear: { alignItems: 'center', paddingVertical: 9 },
@@ -162,11 +175,18 @@ function supplyEstimate(supply?: Supply) {
   return { days: remaining, isWarning: remaining <= supply.warningDays, warningDate };
 }
 
-async function scheduleReminders(doses: Dose[], hideNotificationDetails: boolean) {
+function contactLensReminderDate(prescription: ContactLensPrescription | null) {
+  if (!prescription?.expiration) return null;
+  const expiration = new Date(`${prescription.expiration}T09:00:00`);
+  if (Number.isNaN(expiration.getTime())) return null;
+  expiration.setDate(expiration.getDate() - 30);
+  return expiration.getTime() > Date.now() ? expiration : null;
+}
+async function scheduleReminders(doses: Dose[], hideNotificationDetails: boolean, contactLens: ContactLensPrescription | null = null) {
   await Notifications.cancelAllScheduledNotificationsAsync();
   const validDoses = doses.map((dose) => ({ dose, clock: parseReminderTime(dose.time) })).filter((item): item is { dose: Dose; clock: { hour: number; minute: number } } => item.clock !== null);
   await Promise.all(validDoses.map(({ dose, clock }) => Notifications.scheduleNotificationAsync({
-    content: { title: 'ClearCue reminder', body: hideNotificationDetails ? 'A scheduled eye-drop reminder is due.' : `${dose.name} · ${dose.eye}`, sound: 'default', data: { doseId: dose.id } },
+    content: { title: 'ClearCue reminder', body: hideNotificationDetails ? 'A scheduled eye-drop reminder is due.' : `${dose.name} · ${dose.eye}`, sound: 'default', categoryIdentifier: DOSE_REMINDER_CATEGORY, data: { doseId: dose.id } },
     trigger: { type: Notifications.SchedulableTriggerInputTypes.DAILY, hour: clock.hour, minute: clock.minute },
   })));
   const refillDates = doses.map((dose) => ({ dose, estimate: supplyEstimate(dose.supply) })).filter((item): item is { dose: Dose; estimate: NonNullable<ReturnType<typeof supplyEstimate>> } => item.estimate !== null && item.estimate.warningDate.getTime() > Date.now());
@@ -174,13 +194,16 @@ async function scheduleReminders(doses: Dose[], hideNotificationDetails: boolean
     content: { title: 'ClearCue refill estimate', body: hideNotificationDetails ? 'A medication supply estimate needs your attention.' : `${dose.name} may be running low. Confirm your refill with your pharmacy or clinician.`, sound: 'default', data: { doseId: dose.id, kind: 'refill-estimate' } },
     trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: estimate.warningDate },
   })));
+  const lensExpiration = contactLensReminderDate(contactLens);
+  if (lensExpiration) await Notifications.scheduleNotificationAsync({ content: { title: 'ClearCue prescription reminder', body: hideNotificationDetails ? 'A contact lens prescription expiration date is approaching.' : `Your contact lens prescription expires on ${contactLens?.expiration}. Confirm renewal details with your eye-care clinician.`, sound: 'default', data: { kind: 'contact-lens-expiration' } }, trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: lensExpiration } });
+  if (contactLens?.pairsRemaining && Number(contactLens.pairsRemaining) <= Number(contactLens.reorderAt || 0)) await Notifications.scheduleNotificationAsync({ content: { title: 'ClearCue replacement reminder', body: hideNotificationDetails ? 'Your contact lens replacement estimate needs attention.' : `You have ${contactLens.pairsRemaining} contact lens pair${Number(contactLens.pairsRemaining) === 1 ? '' : 's'} remaining. Review your replacement plan.`, sound: 'default', data: { kind: 'contact-lens-replacement' } }, trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: new Date(Date.now() + 60_000) } });
   return validDoses.length;
 }
 
 export default function App() {
   const [doses, setDoses] = useState(STARTING_DOSES); const [modalOpen, setModalOpen] = useState(false);
   const [editingDoseId, setEditingDoseId] = useState<string | null>(null);
-  const [name, setName] = useState(''); const [time, setTime] = useState('9:00 AM'); const [eye, setEye] = useState<Eye>('Right eye'); const [color, setColor] = useState(COLORS[0]);
+  const [name, setName] = useState(''); const [time, setTime] = useState('9:00 AM'); const [additionalTimes, setAdditionalTimes] = useState<string[]>([]); const [eye, setEye] = useState<Eye>('Right eye'); const [color, setColor] = useState(COLORS[0]);
   const [taperPlan, setTaperPlan] = useState('');
   const [prescriber, setPrescriber] = useState(''); const [pharmacy, setPharmacy] = useState(''); const [rxNumber, setRxNumber] = useState(''); const [personalNotes, setPersonalNotes] = useState('');
   const [bottleMl, setBottleMl] = useState(''); const [dropsPerApplication, setDropsPerApplication] = useState('1'); const [applicationsPerDay, setApplicationsPerDay] = useState('1'); const [openedOn, setOpenedOn] = useState(dateKey(new Date())); const [warningDays, setWarningDays] = useState('7');
@@ -241,13 +264,28 @@ export default function App() {
   useEffect(() => { if (hydrated && !demoMode) AsyncStorage.setItem(TRACKING_START_KEY, trackingStart); }, [trackingStart, hydrated, demoMode]);
   useEffect(() => { if (hydrated && !demoMode) { if (contactLens) void AsyncStorage.setItem(CONTACT_LENS_KEY, JSON.stringify(contactLens)); else void AsyncStorage.removeItem(CONTACT_LENS_KEY); } }, [contactLens, hydrated, demoMode]);
   useEffect(() => { if (hydrated) AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); }, [settings, hydrated]);
-  useEffect(() => { if (hydrated && remindersEnabled && !demoMode) void scheduleReminders(doses, settings.hideNotificationDetails); }, [doses, hydrated, remindersEnabled, settings.hideNotificationDetails, demoMode]);
+  useEffect(() => { if (hydrated && remindersEnabled && !demoMode) void scheduleReminders(doses, settings.hideNotificationDetails, contactLens); }, [doses, hydrated, remindersEnabled, settings.hideNotificationDetails, demoMode, contactLens]);
   useEffect(() => {
     function refreshDailyCompletion() { const today = dateKey(new Date()); setDoses((current) => current.map((dose) => ({ ...dose, completed: history.some((log) => log.doseId === dose.id && log.date === today) }))); }
     const appStateSubscription = AppState.addEventListener('change', (state) => { if (state === 'active') refreshDailyCompletion(); });
     const timer = setInterval(refreshDailyCompletion, 60_000);
     return () => { appStateSubscription.remove(); clearInterval(timer); };
   }, [history]);
+  useEffect(() => {
+    void Notifications.setNotificationCategoryAsync(DOSE_REMINDER_CATEGORY, [
+      { identifier: 'TAKEN', buttonTitle: 'Taken', options: { opensAppToForeground: false } },
+      { identifier: 'SNOOZE', buttonTitle: 'Snooze 10 min', options: { opensAppToForeground: false } },
+      { identifier: 'SKIP', buttonTitle: 'Skip', options: { opensAppToForeground: false } },
+    ]);
+    const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
+      const doseId = response.notification.request.content.data?.doseId;
+      if (typeof doseId !== 'string' || demoMode) return;
+      if (response.actionIdentifier === 'TAKEN') recordDose(doseId, 'taken');
+      if (response.actionIdentifier === 'SKIP') recordDose(doseId, 'missed');
+      if (response.actionIdentifier === 'SNOOZE') void Notifications.scheduleNotificationAsync({ content: { title: 'ClearCue reminder', body: settings.hideNotificationDetails ? 'A scheduled eye-drop reminder is due.' : 'Your snoozed eye-drop reminder is due.', sound: 'default', categoryIdentifier: DOSE_REMINDER_CATEGORY, data: { doseId } }, trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: new Date(Date.now() + 10 * 60_000) } });
+    });
+    return () => subscription.remove();
+  }, [demoMode, settings.hideNotificationDetails]);
   const complete = doses.filter((dose) => dose.completed).length; const percentage = doses.length ? Math.round((complete / doses.length) * 100) : 0;
   const progress = useMemo(() => `${complete} of ${doses.length} completed`, [complete, doses.length]);
   const adherence = useMemo(() => buildAdherence(doses, history, trackingStart), [doses, history, trackingStart]);
@@ -257,42 +295,51 @@ export default function App() {
   const scaleText = settings.largeText ? styles.largeText : undefined;
   const scaleHeading = settings.largeText ? { fontSize: 40, lineHeight: 46 } : undefined;
   const scaleSectionTitle = settings.largeText ? { fontSize: 26, lineHeight: 32 } : undefined;
+  function recordDose(id: string, requestedStatus: AdherenceStatus) {
+    const dose = doses.find((item) => item.id === id); if (!dose) return;
+    const today = dateKey(new Date()); const due = scheduledDate(today, dose.time); const status = requestedStatus === 'taken' && due && new Date().getTime() > due.getTime() + 30 * 60 * 1000 ? 'late' : requestedStatus;
+    setDoses((current) => current.map((item) => item.id === id ? { ...item, completed: status !== 'missed' } : item));
+    setHistory((current) => [...current.filter((log) => !(log.doseId === id && log.date === today)), { doseId: id, date: today, status, completedAt: status === 'missed' ? undefined : new Date().toISOString() }]);
+  }
   function toggleDose(id: string) {
     const dose = doses.find((item) => item.id === id); if (!dose) return;
-    const isCompleting = !dose.completed; const today = dateKey(new Date());
-    setDoses((current) => current.map((item) => item.id === id ? { ...item, completed: isCompleting } : item));
-    if (!isCompleting) { setHistory((current) => current.filter((log) => !(log.doseId === id && log.date === today))); return; }
-    const due = scheduledDate(today, dose.time); const status: DoseLog['status'] = due && new Date().getTime() > due.getTime() + 30 * 60 * 1000 ? 'late' : 'taken';
-    setHistory((current) => [...current.filter((log) => !(log.doseId === id && log.date === today)), { doseId: id, date: today, status, completedAt: new Date().toISOString() }]);
+    const today = dateKey(new Date());
+    if (dose.completed) { setDoses((current) => current.map((item) => item.id === id ? { ...item, completed: false } : item)); setHistory((current) => current.filter((log) => !(log.doseId === id && log.date === today))); return; }
+    recordDose(id, 'taken');
   }
   function saveDose() {
     if (!name.trim()) { Alert.alert('Add a medication name', 'For example, Artificial Tears or Prednisolone Acetate.'); return; }
-    if (!parseReminderTime(time)) { Alert.alert('Use a time like 8:00 AM', 'ClearCue needs a valid reminder time to schedule this medication.'); return; }
+    const allTimes = [time, ...additionalTimes];
+    if (allTimes.some((item) => !parseReminderTime(item))) { Alert.alert('Use a time like 8:00 AM', 'ClearCue needs a valid time for every daily reminder.'); return; }
+    if (new Set(allTimes.map((item) => item.trim().toUpperCase())).size !== allTimes.length) { Alert.alert('Choose different times', 'Each daily reminder for this medication needs its own time.'); return; }
     if (bottleMl && (Number(bottleMl) <= 0 || Number(dropsPerApplication) <= 0 || Number(applicationsPerDay) <= 0 || Number.isNaN(new Date(`${openedOn}T00:00:00`).getTime()))) { Alert.alert('Check the supply estimate', 'Enter a positive bottle size, uses per day, drops per use, and a date like 2026-09-05—or leave bottle size blank to skip the estimate.'); return; }
-    const closeDose = doses.find((dose) => dose.id !== editingDoseId && sharesAnEye(dose.eye, eye) && (minutesBetween(dose.time, time) ?? 999) < 5);
+    const editingGroup = doses.find((dose) => dose.id === editingDoseId)?.scheduleGroupId ?? editingDoseId;
+    const closeDose = doses.find((dose) => dose.scheduleGroupId !== editingGroup && dose.id !== editingDoseId && sharesAnEye(dose.eye, eye) && allTimes.some((item) => (minutesBetween(dose.time, item) ?? 999) < 5));
     if (closeDose) { Alert.alert('These drops are very close together', `${closeDose.name} is scheduled at ${closeDose.time}. Confirm the spacing in the clinician’s instructions before saving.`, [{ text: 'Go back', style: 'cancel' }, { text: 'Save anyway', onPress: persistDose }]); return; }
     persistDose();
   }
   function persistDose() {
     const supply = bottleMl ? { bottleMl: Number(bottleMl), dropsPerApplication: Number(dropsPerApplication) || 1, applicationsPerDay: Number(applicationsPerDay) || 1, openedOn, warningDays: Number(warningDays) || 7, dropsPerMl: 20 } : undefined;
     const prescription = prescriber.trim() || pharmacy.trim() || rxNumber.trim() || personalNotes.trim() ? { prescriber: prescriber.trim() || undefined, pharmacy: pharmacy.trim() || undefined, rxNumber: rxNumber.trim() || undefined, notes: personalNotes.trim() || undefined } : undefined;
-    const next = { name: name.trim(), eye, color, time: time.trim(), catalogId: selectedMedication?.id, taperPlan: taperPlan.trim() || undefined, supply, prescription };
-    setDoses((current) => editingDoseId ? current.map((dose) => dose.id === editingDoseId ? { ...dose, ...next } : dose) : [...current, { id: String(Date.now()), ...next, completed: false }]);
-    setName(''); setTime('9:00 AM'); setEye('Right eye'); setColor(COLORS[0]); setTaperPlan(''); setPrescriber(''); setPharmacy(''); setRxNumber(''); setPersonalNotes(''); setBottleMl(''); setDropsPerApplication('1'); setApplicationsPerDay('1'); setOpenedOn(dateKey(new Date())); setWarningDays('7'); setSelectedMedication(null); setEditingDoseId(null); setModalOpen(false);
+    const groupId = editingDoseId ? (doses.find((dose) => dose.id === editingDoseId)?.scheduleGroupId ?? editingDoseId) : `schedule-${Date.now()}`;
+    const times = [time, ...additionalTimes].map((item) => item.trim()).sort((a, b) => (parseReminderTime(a)!.hour * 60 + parseReminderTime(a)!.minute) - (parseReminderTime(b)!.hour * 60 + parseReminderTime(b)!.minute));
+    setDoses((current) => { const existing = current.filter((dose) => (dose.scheduleGroupId ?? dose.id) === groupId); const untouched = current.filter((dose) => (dose.scheduleGroupId ?? dose.id) !== groupId); const next = { name: name.trim(), eye, color, catalogId: selectedMedication?.id, taperPlan: taperPlan.trim() || undefined, supply, prescription, scheduleGroupId: groupId }; return [...untouched, ...times.map((scheduledTime, index) => { const matching = existing.find((dose) => dose.time === scheduledTime); return { id: matching?.id ?? (index === 0 && editingDoseId ? editingDoseId : `${groupId}-${index}`), ...next, time: scheduledTime, completed: matching?.completed ?? false }; })]; });
+    setName(''); setTime('9:00 AM'); setAdditionalTimes([]); setEye('Right eye'); setColor(COLORS[0]); setTaperPlan(''); setPrescriber(''); setPharmacy(''); setRxNumber(''); setPersonalNotes(''); setBottleMl(''); setDropsPerApplication('1'); setApplicationsPerDay('1'); setOpenedOn(dateKey(new Date())); setWarningDays('7'); setSelectedMedication(null); setEditingDoseId(null); setModalOpen(false);
   }
-  function editDose(dose: Dose) { setEditingDoseId(dose.id); setName(dose.name); setTime(dose.time); setEye(dose.eye); setColor(dose.color); setTaperPlan(dose.taperPlan ?? ''); setPrescriber(dose.prescription?.prescriber ?? ''); setPharmacy(dose.prescription?.pharmacy ?? ''); setRxNumber(dose.prescription?.rxNumber ?? ''); setPersonalNotes(dose.prescription?.notes ?? ''); setBottleMl(dose.supply ? String(dose.supply.bottleMl) : ''); setDropsPerApplication(String(dose.supply?.dropsPerApplication ?? 1)); setApplicationsPerDay(String(dose.supply?.applicationsPerDay ?? 1)); setOpenedOn(dose.supply?.openedOn ?? dateKey(new Date())); setWarningDays(String(dose.supply?.warningDays ?? 7)); setSelectedMedication(null); setModalOpen(true); }
-  function startAddingDose() { setEditingDoseId(null); setName(''); setTime('9:00 AM'); setEye('Right eye'); setColor(COLORS[0]); setTaperPlan(''); setPrescriber(''); setPharmacy(''); setRxNumber(''); setPersonalNotes(''); setBottleMl(''); setDropsPerApplication('1'); setApplicationsPerDay('1'); setOpenedOn(dateKey(new Date())); setWarningDays('7'); setSelectedMedication(null); setModalOpen(true); }
+  function editDose(dose: Dose) { const group = doses.filter((item) => (item.scheduleGroupId ?? item.id) === (dose.scheduleGroupId ?? dose.id)).sort((a, b) => (parseReminderTime(a.time)!.hour * 60 + parseReminderTime(a.time)!.minute) - (parseReminderTime(b.time)!.hour * 60 + parseReminderTime(b.time)!.minute)); setEditingDoseId(dose.id); setName(dose.name); setTime(group[0]?.time ?? dose.time); setAdditionalTimes(group.slice(1).map((item) => item.time)); setEye(dose.eye); setColor(dose.color); setTaperPlan(dose.taperPlan ?? ''); setPrescriber(dose.prescription?.prescriber ?? ''); setPharmacy(dose.prescription?.pharmacy ?? ''); setRxNumber(dose.prescription?.rxNumber ?? ''); setPersonalNotes(dose.prescription?.notes ?? ''); setBottleMl(dose.supply ? String(dose.supply.bottleMl) : ''); setDropsPerApplication(String(dose.supply?.dropsPerApplication ?? 1)); setApplicationsPerDay(String(dose.supply?.applicationsPerDay ?? 1)); setOpenedOn(dose.supply?.openedOn ?? dateKey(new Date())); setWarningDays(String(dose.supply?.warningDays ?? 7)); setSelectedMedication(null); setModalOpen(true); }
+  function startAddingDose() { setEditingDoseId(null); setName(''); setTime('9:00 AM'); setAdditionalTimes([]); setEye('Right eye'); setColor(COLORS[0]); setTaperPlan(''); setPrescriber(''); setPharmacy(''); setRxNumber(''); setPersonalNotes(''); setBottleMl(''); setDropsPerApplication('1'); setApplicationsPerDay('1'); setOpenedOn(dateKey(new Date())); setWarningDays('7'); setSelectedMedication(null); setModalOpen(true); }
   function deleteEditingDose() {
     if (!editingDoseId) return;
     const dose = doses.find((item) => item.id === editingDoseId);
-    Alert.alert('Remove this eye drop?', `${dose?.name ?? 'This medication'} will be removed from the routine and future local reminders will be resynced.`, [{ text: 'Cancel', style: 'cancel' }, { text: 'Remove', style: 'destructive', onPress: () => { setDoses((current) => current.filter((item) => item.id !== editingDoseId)); setHistory((current) => current.filter((log) => log.doseId !== editingDoseId)); setEditingDoseId(null); setSelectedMedication(null); setModalOpen(false); } }]);
+    const groupId = dose?.scheduleGroupId ?? editingDoseId;
+    Alert.alert('Remove this eye drop?', `${dose?.name ?? 'This medication'} and all of its daily reminder times will be removed from the routine.`, [{ text: 'Cancel', style: 'cancel' }, { text: 'Remove', style: 'destructive', onPress: () => { const ids = doses.filter((item) => (item.scheduleGroupId ?? item.id) === groupId).map((item) => item.id); setDoses((current) => current.filter((item) => !ids.includes(item.id))); setHistory((current) => current.filter((log) => !ids.includes(log.doseId))); setEditingDoseId(null); setSelectedMedication(null); setModalOpen(false); } }]);
   }
   async function enableReminders() {
     if (demoMode) { Alert.alert('Demo notifications stay off', 'Demo Mode never schedules real notifications. Turn off Demo Mode to use reminders for your own routine.'); return; }
     let permissions = await Notifications.getPermissionsAsync();
     if (!permissions.granted) permissions = await Notifications.requestPermissionsAsync({ ios: { allowAlert: true, allowBadge: false, allowSound: true } });
     if (!permissions.granted) { Alert.alert('Notifications are off', 'To receive reminders, allow notifications for Expo Go in your iPhone Settings.'); return; }
-    const scheduled = await scheduleReminders(doses, settings.hideNotificationDetails);
+    const scheduled = await scheduleReminders(doses, settings.hideNotificationDetails, contactLens);
     setRemindersEnabled(true);
     Alert.alert('Daily reminders are on', `${scheduled} reminder${scheduled === 1 ? '' : 's'} will appear at the scheduled times.`);
   }
@@ -313,7 +360,7 @@ export default function App() {
     <View style={[styles.reminderCard, settings.highContrast && styles.highContrastSoftCard]}><View style={styles.reminderCopy}><Text style={[styles.reminderTitle, scaleText]}>{copy.reminders}</Text><Text style={[styles.reminderText, scaleText]}>{remindersEnabled ? 'Your schedule is synced with iPhone reminders.' : 'Turn on gentle reminders for your routine.'}</Text></View><Pressable accessibilityRole="button" accessibilityLabel={remindersEnabled ? copy.synced : copy.enable} onPress={() => void enableReminders()} style={[styles.reminderButton, remindersEnabled && styles.reminderButtonOn]}><Text style={styles.reminderButtonText}>{remindersEnabled ? copy.synced : copy.enable}</Text></Pressable></View>
     <View style={[styles.tip, settings.highContrast && styles.highContrastSoftCard]}><Text style={styles.tipIcon}>i</Text><View style={styles.tipContent}><Text style={[styles.tipTitle, scaleText]}>{copy.spacing}</Text><Text style={[styles.tipText, scaleText]}>{copy.spacingDetail}</Text></View></View>
   </ScrollView><Pressable accessibilityRole="button" style={styles.addButton} onPress={startAddingDose} accessibilityLabel={copy.add} accessibilityHint="Opens a form to add an eye-drop reminder"><Text style={styles.addPlus}>＋</Text><Text style={[styles.addText, scaleText]}>{copy.add}</Text></Pressable>
-  <AddMedicationModal visible={modalOpen} animation={settings.reduceMotion ? 'none' : 'slide'} isEditing={Boolean(editingDoseId)} name={name} time={time} eye={eye} color={color} clinicianInstructions={taperPlan} prescriber={prescriber} pharmacy={pharmacy} rxNumber={rxNumber} personalNotes={personalNotes} bottleMl={bottleMl} dropsPerApplication={dropsPerApplication} applicationsPerDay={applicationsPerDay} openedOn={openedOn} warningDays={warningDays} selectedMedication={selectedMedication} onName={(value) => { setName(value); setSelectedMedication(null); }} onSelectMedication={(medication) => { setSelectedMedication(medication); setName(medication.genericName); }} onTime={setTime} onClinicianInstructions={setTaperPlan} onPrescriber={setPrescriber} onPharmacy={setPharmacy} onRxNumber={setRxNumber} onPersonalNotes={setPersonalNotes} onBottleMl={setBottleMl} onDropsPerApplication={setDropsPerApplication} onApplicationsPerDay={setApplicationsPerDay} onOpenedOn={setOpenedOn} onWarningDays={setWarningDays} onEye={setEye} onColor={setColor} onClose={() => setModalOpen(false)} onSave={saveDose} onDelete={deleteEditingDose} /></SafeAreaView>
+  <AddMedicationModal visible={modalOpen} animation={settings.reduceMotion ? 'none' : 'slide'} isEditing={Boolean(editingDoseId)} name={name} time={time} additionalTimes={additionalTimes} eye={eye} color={color} clinicianInstructions={taperPlan} prescriber={prescriber} pharmacy={pharmacy} rxNumber={rxNumber} personalNotes={personalNotes} bottleMl={bottleMl} dropsPerApplication={dropsPerApplication} applicationsPerDay={applicationsPerDay} openedOn={openedOn} warningDays={warningDays} selectedMedication={selectedMedication} onName={(value) => { setName(value); setSelectedMedication(null); }} onSelectMedication={(medication) => { setSelectedMedication(medication); setName(medication.genericName); }} onTime={setTime} onAdditionalTimes={setAdditionalTimes} onClinicianInstructions={setTaperPlan} onPrescriber={setPrescriber} onPharmacy={setPharmacy} onRxNumber={setRxNumber} onPersonalNotes={setPersonalNotes} onBottleMl={setBottleMl} onDropsPerApplication={setDropsPerApplication} onApplicationsPerDay={setApplicationsPerDay} onOpenedOn={setOpenedOn} onWarningDays={setWarningDays} onEye={setEye} onColor={setColor} onClose={() => setModalOpen(false)} onSave={saveDose} onDelete={deleteEditingDose} /></SafeAreaView>
   {launching && <Animated.View pointerEvents="none" accessible accessibilityLabel="ClearCue is loading" style={[extraStyles.splashScreen, { opacity: splashOpacity }]}><Image source={require('./assets/clearcue-icon.png')} style={extraStyles.splashIcon} /><Text style={extraStyles.splashTitle}>ClearCue</Text><Text style={extraStyles.splashSubtitle}>Clearer routines, one drop at a time.</Text></Animated.View>}
   <DoctorReportModal visible={reportOpen} animation={settings.reduceMotion ? 'none' : 'slide'} days={reportDays} data={reportData} onDays={setReportDays} onClose={() => setReportOpen(false)} /><DoseHistoryModal visible={historyDose !== null} animation={settings.reduceMotion ? 'none' : 'slide'} dose={historyDose} history={history} trackingStart={trackingStart} onClose={() => setHistoryDoseId(null)} /><ContactLensModal visible={contactLensOpen} animation={settings.reduceMotion ? 'none' : 'slide'} prescription={contactLens} onSave={(prescription) => { setContactLens(prescription); setContactLensOpen(false); }} onClear={() => { setContactLens(null); setContactLensOpen(false); }} onClose={() => setContactLensOpen(false)} /><PrivacyModal visible={privacyOpen} animation={settings.reduceMotion ? 'none' : 'slide'} hideNotificationDetails={settings.hideNotificationDetails} onHideNotificationDetails={(value) => setSettings((current) => ({ ...current, hideNotificationDetails: value }))} onErase={() => { Alert.alert('Erase routine data?', 'This permanently removes medications, private prescription details, contact lens details, and adherence history from this device. Accessibility settings will stay.', [{ text: 'Cancel', style: 'cancel' }, { text: 'Erase data', style: 'destructive', onPress: () => { void AsyncStorage.multiRemove([STORAGE_KEY, HISTORY_KEY, TRACKING_START_KEY, CONTACT_LENS_KEY]); void Notifications.cancelAllScheduledNotificationsAsync(); setDoses([]); setHistory([]); setContactLens(null); setTrackingStart(dateKey(new Date())); setRemindersEnabled(false); setPrivacyOpen(false); } }]); }} onClose={() => setPrivacyOpen(false)} /><SettingsModal visible={settingsOpen} animation={settings.reduceMotion ? 'none' : 'slide'} settings={settings} onChange={setSettings} onShowOnboarding={() => { setSettingsOpen(false); setOnboardingStep(0); setOnboardingVisible(true); }} demoMode={demoMode} onDemoMode={(enabled) => void toggleDemoMode(enabled)} onResetDemo={resetDemoMode} onClose={() => setSettingsOpen(false)} /><DropGuideModal visible={guideOpen} animation={settings.reduceMotion ? 'none' : 'slide'} onClose={() => setGuideOpen(false)} /><OnboardingModal visible={onboardingVisible} animation={settings.reduceMotion ? 'none' : 'slide'} step={onboardingStep} onNext={() => setOnboardingStep((current) => Math.min(current + 1, 2))} onComplete={() => { setOnboardingVisible(false); setOnboardingStep(0); void AsyncStorage.setItem(ONBOARDING_KEY, 'complete'); }} /></>;
 }
@@ -369,7 +416,7 @@ function DoseHistoryModal({ visible, animation, dose, history, trackingStart, on
     const day = new Date(now); day.setHours(0, 0, 0, 0); day.setDate(day.getDate() - (13 - index));
     const date = dateKey(day); const log = history.find((item) => item.doseId === dose.id && item.date === date); const due = scheduledDate(date, dose.time);
     const status = log?.status ?? (date < trackingStart ? 'not tracked' : due && due.getTime() > now.getTime() ? 'upcoming' : 'missed');
-    return { date, label: day.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }), status, recordedAt: log ? new Date(log.completedAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : null };
+    return { date, label: day.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }), status, recordedAt: log?.completedAt ? new Date(log.completedAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : null };
   }).reverse();
   const statusStyle = (status: string) => status === 'taken' ? { color: '#557A66', backgroundColor: '#E7F0E9' } : status === 'late' ? { color: '#9B6B3D', backgroundColor: '#F5E5D8' } : status === 'missed' ? { color: '#A33C34', backgroundColor: '#FBE7E4' } : { color: '#6F625B', backgroundColor: '#F2EBE4' };
   const statusLabel = (status: string) => status === 'taken' ? 'On time' : status === 'late' ? 'Late' : status === 'missed' ? 'Missed' : status === 'upcoming' ? 'Upcoming' : 'Not tracked';
@@ -415,20 +462,20 @@ function OnboardingModal({ visible, animation, step, onNext, onComplete }: { vis
   return <Modal visible={visible} animationType={animation} presentationStyle="fullScreen" onRequestClose={onComplete}><SafeAreaView style={extraStyles.onboardingScreen}><View style={extraStyles.onboardingContent}><View style={styles.logo}><Text style={styles.logoText}>◒</Text></View><Text style={styles.sectionLabel}>{current.eyebrow}</Text><Text style={extraStyles.onboardingTitle}>{current.title}</Text><Text style={extraStyles.onboardingBody}>{current.body}</Text><View style={extraStyles.onboardingDots}>{screens.map((_, index) => <View key={index} style={[extraStyles.onboardingDot, index === step && extraStyles.onboardingDotActive]} />)}</View></View><View style={extraStyles.onboardingFooter}><Pressable accessibilityRole="button" accessibilityLabel={step === screens.length - 1 ? 'Get started with ClearCue' : 'Continue onboarding'} onPress={step === screens.length - 1 ? onComplete : onNext} style={styles.saveButton}><Text style={styles.saveText}>{step === screens.length - 1 ? 'Get started' : 'Continue'}</Text></Pressable>{step < screens.length - 1 && <Pressable accessibilityRole="button" accessibilityLabel="Skip onboarding" onPress={onComplete} style={extraStyles.onboardingSkip}><Text style={styles.history}>Skip for now</Text></Pressable>}</View></SafeAreaView></Modal>;
 }
 function SettingRow({ title, detail, value, onChange }: { title: string; detail: string; value: boolean; onChange: (value: boolean) => void }) { return <View style={styles.settingRow}><View style={styles.settingCopy}><Text style={styles.settingTitle}>{title}</Text><Text style={styles.settingDetail}>{detail}</Text></View><Switch accessibilityLabel={title} value={value} onValueChange={onChange} trackColor={{ false: '#D6C4B8', true: '#B85C4A' }} /></View>; }
-type ModalProps = { visible: boolean; animation: 'none' | 'slide'; isEditing: boolean; name: string; time: string; eye: Eye; color: string; clinicianInstructions: string; prescriber: string; pharmacy: string; rxNumber: string; personalNotes: string; bottleMl: string; dropsPerApplication: string; applicationsPerDay: string; openedOn: string; warningDays: string; selectedMedication: CatalogMedication | null; onName: (v: string) => void; onSelectMedication: (medication: CatalogMedication) => void; onTime: (v: string) => void; onClinicianInstructions: (v: string) => void; onPrescriber: (v: string) => void; onPharmacy: (v: string) => void; onRxNumber: (v: string) => void; onPersonalNotes: (v: string) => void; onBottleMl: (v: string) => void; onDropsPerApplication: (v: string) => void; onApplicationsPerDay: (v: string) => void; onOpenedOn: (v: string) => void; onWarningDays: (v: string) => void; onEye: (v: Eye) => void; onColor: (v: string) => void; onClose: () => void; onSave: () => void; onDelete: () => void };
+type ModalProps = { visible: boolean; animation: 'none' | 'slide'; isEditing: boolean; name: string; time: string; additionalTimes: string[]; eye: Eye; color: string; clinicianInstructions: string; prescriber: string; pharmacy: string; rxNumber: string; personalNotes: string; bottleMl: string; dropsPerApplication: string; applicationsPerDay: string; openedOn: string; warningDays: string; selectedMedication: CatalogMedication | null; onName: (v: string) => void; onSelectMedication: (medication: CatalogMedication) => void; onTime: (v: string) => void; onAdditionalTimes: (v: string[]) => void; onClinicianInstructions: (v: string) => void; onPrescriber: (v: string) => void; onPharmacy: (v: string) => void; onRxNumber: (v: string) => void; onPersonalNotes: (v: string) => void; onBottleMl: (v: string) => void; onDropsPerApplication: (v: string) => void; onApplicationsPerDay: (v: string) => void; onOpenedOn: (v: string) => void; onWarningDays: (v: string) => void; onEye: (v: Eye) => void; onColor: (v: string) => void; onClose: () => void; onSave: () => void; onDelete: () => void };
 function AddMedicationModal(props: ModalProps) {
-  const suggestions = searchMedications(props.name);
-  const [timeMenuOpen, setTimeMenuOpen] = useState(false);
-  useEffect(() => { if (!props.visible) setTimeMenuOpen(false); }, [props.visible]);
+  const [medicationFilter, setMedicationFilter] = useState<MedicationFilter>('All');
+  const suggestions = searchMedications(props.name, medicationFilter);
   return (
     <Modal visible={props.visible} animationType={props.animation} presentationStyle="pageSheet" onRequestClose={props.onClose}>
       <SafeAreaView style={styles.modalScreen}>
         <View style={styles.modalHeader}><View><Text style={styles.sectionLabel}>{props.isEditing ? 'EDIT PRESCRIPTION' : 'NEW PRESCRIPTION'}</Text><Text style={styles.modalTitle}>{props.isEditing ? 'Edit eye drop' : 'Add eye drop'}</Text></View><Pressable accessibilityRole="button" accessibilityLabel="Close add medication form" style={styles.close} onPress={props.onClose}><Text style={styles.closeText}>×</Text></Pressable></View>
         <ScrollView contentContainerStyle={styles.form} keyboardShouldPersistTaps="handled">
-          <Field label="Search eye medications"><TextInput accessibilityLabel="Search eye medications" value={props.name} onChangeText={props.onName} placeholder="Generic or brand name" placeholderTextColor="#81969A" style={styles.input} /></Field>
+          <Field label="Search eye medications"><TextInput accessibilityLabel="Search eye medications" value={props.name} onChangeText={props.onName} placeholder="Generic, brand, or common name" placeholderTextColor="#81969A" style={styles.input} /></Field><View style={extraStyles.filterRow}>{MEDICATION_FILTERS.map((filter) => <Pressable accessibilityRole="radio" accessibilityState={{ selected: medicationFilter === filter }} accessibilityLabel={`Filter medications: ${filter}`} key={filter} onPress={() => setMedicationFilter(filter)} style={[extraStyles.filterChip, medicationFilter === filter && extraStyles.filterChipSelected]}><Text style={[extraStyles.filterChipText, medicationFilter === filter && extraStyles.filterChipTextSelected]}>{filter}</Text></Pressable>)}</View>
           <View style={{ gap: 8, marginTop: -12 }}>{suggestions.map((medication) => <Pressable accessibilityRole="button" accessibilityLabel={`Choose ${medication.genericName}`} key={medication.id} onPress={() => props.onSelectMedication(medication)} style={{ padding: 12, borderRadius: 12, borderWidth: 1, borderColor: props.selectedMedication?.id === medication.id ? '#B85C4A' : '#E7DDD4', backgroundColor: props.selectedMedication?.id === medication.id ? '#F5E5D8' : '#FFFFFF' }}><Text style={{ fontSize: 14, fontWeight: '800', color: '#3A302B' }}>{medication.genericName}</Text><Text style={{ fontSize: 11, color: '#6F625B', marginTop: 3 }}>{medication.brandNames.join(' · ')} · {medication.category}</Text></Pressable>)}</View>
           {props.selectedMedication && <View style={{ backgroundColor: '#F5E5D8', borderRadius: 14, padding: 14, marginTop: -12 }}><Text style={{ fontSize: 14, fontWeight: '800', color: '#3A302B' }}>{props.selectedMedication.genericName}</Text><Text style={{ fontSize: 12, fontWeight: '700', color: '#B85C4A', marginTop: 3 }}>{props.selectedMedication.category} · {props.selectedMedication.form}</Text><Text style={{ fontSize: 12, color: '#6F625B', lineHeight: 17, marginTop: 5 }}>{props.selectedMedication.commonUse}</Text><Text style={{ fontSize: 11, color: '#704D30', lineHeight: 16, marginTop: 8 }}>Use the instructions on your prescription label and from your clinician. ClearCue does not provide dosing directions.</Text><Text style={{ fontSize: 10, color: '#6F625B', marginTop: 7 }}>{props.selectedMedication.prescriptionStatus ?? (props.selectedMedication.id === 'artificial-tears' ? 'Over-the-counter' : 'Prescription')} reference · {props.selectedMedication.source} · reviewed {props.selectedMedication.reviewedOn}</Text></View>}
-          <TimePicker value={props.time} open={timeMenuOpen} onToggle={() => setTimeMenuOpen((current) => !current)} onChange={(value) => { props.onTime(value); setTimeMenuOpen(false); }} />
+          <TimePicker label="First daily reminder" value={props.time} onChange={props.onTime} />
+          <View style={extraStyles.extraTimes}><Text style={styles.fieldLabel}>Additional daily reminders</Text><Text style={extraStyles.supplyHelp}>Use this when the same medication is taken more than once a day.</Text>{props.additionalTimes.map((item, index) => <View key={`${index}-${item}`} style={extraStyles.extraTimeRow}><View style={{ flex: 1 }}><TimePicker label={`Reminder ${index + 2}`} value={item} onChange={(value) => props.onAdditionalTimes(props.additionalTimes.map((current, currentIndex) => currentIndex === index ? value : current))} /></View><Pressable accessibilityRole="button" accessibilityLabel={`Remove reminder ${index + 2}`} onPress={() => props.onAdditionalTimes(props.additionalTimes.filter((_, currentIndex) => currentIndex !== index))} style={extraStyles.removeTime}><Text style={extraStyles.removeTimeText}>×</Text></Pressable></View>)}<Pressable accessibilityRole="button" accessibilityLabel="Add another daily reminder time" onPress={() => props.onAdditionalTimes([...props.additionalTimes, '1:00 PM'])} style={extraStyles.addTime}><Text style={extraStyles.addTimeText}>＋ Add another daily time</Text></Pressable></View>
           <Field label="Clinician application instructions (optional)"><TextInput accessibilityLabel="Clinician application instructions" value={props.clinicianInstructions} onChangeText={props.onClinicianInstructions} placeholder="Copy the instructions from your clinician or prescription label" placeholderTextColor="#81969A" multiline style={[styles.input, { height: 78, paddingTop: 12, textAlignVertical: 'top' }]} /></Field>
           <View style={extraStyles.detailsSection}><Text style={styles.fieldLabel}>Private prescription details (optional)</Text><Text style={extraStyles.supplyHelp}>Stored only on this device. These details are never used to change a medication schedule.</Text><Field label="Prescriber"><TextInput accessibilityLabel="Prescriber name" value={props.prescriber} onChangeText={props.onPrescriber} placeholder="e.g. Dr. Rivera" placeholderTextColor="#81969A" style={styles.input} /></Field><Field label="Pharmacy"><TextInput accessibilityLabel="Pharmacy name" value={props.pharmacy} onChangeText={props.onPharmacy} placeholder="e.g. Main Street Pharmacy" placeholderTextColor="#81969A" style={styles.input} /></Field><Field label="Prescription number"><TextInput accessibilityLabel="Prescription number" value={props.rxNumber} onChangeText={props.onRxNumber} placeholder="Optional" placeholderTextColor="#81969A" style={styles.input} /></Field><Field label="Personal note"><TextInput accessibilityLabel="Personal medication note" value={props.personalNotes} onChangeText={props.onPersonalNotes} placeholder="Optional reminder for yourself" placeholderTextColor="#81969A" multiline style={[styles.input, { height: 70, paddingTop: 12, textAlignVertical: 'top' }]} /></Field></View>
           <View style={styles.note}><Text style={styles.noteTitle}>ClearCue supports your plan</Text><Text style={styles.noteText}>ClearCue does not diagnose, prescribe, change a dose, or replace your clinician’s instructions or prescription label.</Text></View>
@@ -443,8 +490,9 @@ function AddMedicationModal(props: ModalProps) {
     </Modal>
   );
 }
-function TimePicker({ value, open, onToggle, onChange }: { value: string; open: boolean; onToggle: () => void; onChange: (value: string) => void }) {
-  return <Field label="Reminder time"><Pressable accessibilityRole="button" accessibilityState={{ expanded: open }} accessibilityLabel={`Reminder time: ${value}. Open time menu`} accessibilityHint="Choose a common reminder time or enter a custom time" onPress={onToggle} style={extraStyles.timePickerButton}><Text style={extraStyles.timePickerValue}>{value || 'Select a time'}</Text><Text style={extraStyles.timePickerArrow}>{open ? '⌃' : '⌄'}</Text></Pressable>{open && <View style={extraStyles.timeMenu}><Text style={extraStyles.supplyHelp}>Choose a common time</Text><View style={extraStyles.timeMenuGrid}>{TIME_OPTIONS.map((option) => <Pressable accessibilityRole="radio" accessibilityState={{ selected: value === option }} accessibilityLabel={option} key={option} onPress={() => onChange(option)} style={[extraStyles.timeOption, value === option && extraStyles.timeOptionSelected]}><Text style={[extraStyles.timeOptionText, value === option && extraStyles.timeOptionTextSelected]}>{option}</Text></Pressable>)}</View><Text style={[styles.fieldLabel, { marginTop: 5 }]}>Or enter a custom time</Text><TextInput accessibilityLabel="Custom reminder time" value={value} onChangeText={onChange} placeholder="e.g. 8:30 AM" placeholderTextColor="#81969A" style={styles.input} /><Text style={extraStyles.supplyHelp}>Use a time like 8:30 AM. Your iPhone reminder will use this exact time.</Text></View>}</Field>;
+function TimePicker({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+  const [open, setOpen] = useState(false);
+  return <Field label={label}><Pressable accessibilityRole="button" accessibilityState={{ expanded: open }} accessibilityLabel={`${label}: ${value}. Open time menu`} accessibilityHint="Choose a common reminder time or enter a custom time" onPress={() => setOpen((current) => !current)} style={extraStyles.timePickerButton}><Text style={extraStyles.timePickerValue}>{value || 'Select a time'}</Text><Text style={extraStyles.timePickerArrow}>{open ? '⌃' : '⌄'}</Text></Pressable>{open && <View style={extraStyles.timeMenu}><Text style={extraStyles.supplyHelp}>Choose a common time</Text><View style={extraStyles.timeMenuGrid}>{TIME_OPTIONS.map((option) => <Pressable accessibilityRole="radio" accessibilityState={{ selected: value === option }} accessibilityLabel={option} key={option} onPress={() => { onChange(option); setOpen(false); }} style={[extraStyles.timeOption, value === option && extraStyles.timeOptionSelected]}><Text style={[extraStyles.timeOptionText, value === option && extraStyles.timeOptionTextSelected]}>{option}</Text></Pressable>)}</View><Text style={[styles.fieldLabel, { marginTop: 5 }]}>Or enter a custom time</Text><TextInput accessibilityLabel={`Custom ${label.toLowerCase()}`} value={value} onChangeText={onChange} placeholder="e.g. 8:30 AM" placeholderTextColor="#81969A" style={styles.input} /><Text style={extraStyles.supplyHelp}>Use a time like 8:30 AM. Your iPhone reminder will use this exact time.</Text></View>}</Field>;
 }
 function Field({ label, children }: { label: string; children: React.ReactNode }) { return <View><Text style={styles.fieldLabel}>{label}</Text>{children}</View>; }
 const styles = StyleSheet.create({

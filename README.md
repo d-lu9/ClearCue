@@ -1,23 +1,67 @@
 # ClearCue
 
-An original eye-drop routine prototype for a Congressional App Challenge project.
+ClearCue is an original, iPhone-first eye-medication routine prototype for a 2026 Congressional App Challenge project. It supports a clinician’s plan; it does not diagnose, prescribe, or replace prescription-label or clinician instructions.
 
-## Browser prototype
+## Run the mobile prototype
 
-Open `index.html` in a modern browser. No account, server, or installation is required.
-
-## iPhone-first mobile prototype
-
-The native mobile project is in [`mobile/`](mobile). To run it on an iPhone:
+The native mobile project is in [`mobile/`](mobile).
 
 1. Install **Expo Go** from the App Store and connect the phone and computer to the same Wi-Fi network.
 2. In a terminal, run `cd mobile` followed by `npm start`.
-3. Scan the QR code shown in the terminal with your iPhone camera, then open the link in Expo Go.
+3. Scan the QR code with the iPhone camera and open it in Expo Go.
 
-The mobile app currently includes the ClearCue dashboard, color- and eye-specific medication cards, on-device routine storage, completion tracking, an add-medication flow, opt-in daily local notifications, seven-day adherence insights, and a patient-controlled 7- or 30-day Doctor Report summary.
+Local reminder actions and full notification behavior should be tested in an iOS development build before release; Expo Go has notification limitations.
 
-## Next mobile milestone
+## Current features
 
-- Add adherence history and optional daily reset behavior
-- Add safe reminder spacing when new prescriptions are added
-- Add an accessibility and caregiver mode
+- Local-only eye-drop routines, prescription details, contact-lens reference, and adherence data
+- Multiple daily reminder times for a single medication, with safe spacing warnings
+- Time picker, medication search, brand/alias support, and category filters
+- Daily adherence history, weekly insights, refill estimates, and clinician-shareable reports
+- Contact-lens expiration and replacement-plan reminders
+- Clinician-safe “How to use drops” guide, including urgent-symptoms guidance
+- Accessibility defaults: large text, high contrast, VoiceOver labels, reduced motion, color-safe labels, and core Spanish home-screen labels
+- Demo Mode, onboarding, app icon/splash screen, and device-only privacy controls
+
+## Version history
+
+### v1.6.0 — Routine and reminder polish
+
+- Added multiple daily times under one medication, expandable time pickers, and group editing/removal.
+- Added notification actions for Taken, Snooze 10 minutes, and Skip.
+- Added local contact-lens expiration and replacement reminders.
+- Added medication category filters for glaucoma, dry eye, allergy, and post-operative care.
+- Updated Expo and safe-area support.
+
+### v1.5.0 — Contact lenses and interface improvements
+
+- Added a local contact-lens prescription reference with right/left lens values, renewal details, and replacement planning.
+- Added a clinician-safe urgent-symptoms note to the drop-application guide.
+- Added the reminder-time dropdown and Calm Clinic interface refinements.
+
+### v1.4.0 — Presentation and demo experience
+
+- Added the ClearCue icon, splash screen, polished empty states, Demo Mode, and expanded Spanish home-screen support.
+- Made insights, reports, privacy, history, and settings easier to find.
+
+### v1.3.0 — Privacy, safety, and patient records
+
+- Added private prescription details, refill estimates, contact-lens planning, dose history, and a read-only shareable report.
+- Added device-only privacy controls, onboarding, clinician application instructions, and supply estimates.
+
+### v1.2.0 — Accessible adherence support
+
+- Added weekly adherence tracking, streaks, medication-level insights, and Doctor Reports.
+- Added large text, high contrast, VoiceOver labels, reduced motion, color-safe labels, and Spanish foundations.
+
+### v1.1.0 — Medication and reminder foundations
+
+- Added an offline eye-medication catalog, medication editing/deletion, daily completion reset, safe reminder spacing, and local notifications.
+
+### v1.0.0 — ClearCue prototype
+
+- Created the original dashboard, eye-specific medication cards, local routine storage, and an iPhone-first Expo prototype.
+
+## Next milestone
+
+- Expand the offline eye-medication catalog with carefully reviewed source data before considering a connected prescription database.

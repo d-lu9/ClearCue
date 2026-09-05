@@ -11,6 +11,9 @@ export type CatalogMedication = {
   aliases?: string[];
 };
 
+export const MEDICATION_FILTERS = ['All', 'Glaucoma', 'Dry eye', 'Allergy', 'Post-op'] as const;
+export type MedicationFilter = typeof MEDICATION_FILTERS[number];
+
 // Starter catalog only. Product packaging and label colors vary by manufacturer.
 // Medication instructions must always come from the patient's clinician or bottle label.
 export const MEDICATIONS: CatalogMedication[] = [
@@ -37,8 +40,10 @@ export const MEDICATIONS: CatalogMedication[] = [
   { id: 'artificial-tears', genericName: 'Artificial tears', brandNames: ['Refresh', 'Systane'], category: 'Lubricant', commonUse: 'Helps relieve dry-eye symptoms', form: 'Ophthalmic solution or gel', source: 'DailyMed / product label', reviewedOn: '2026-09-05' },
 ];
 
-export function searchMedications(query: string) {
+export function searchMedications(query: string, filter: MedicationFilter = 'All') {
   const normalized = query.trim().toLowerCase();
-  if (!normalized) return MEDICATIONS.slice(0, 5);
-  return MEDICATIONS.filter((medication) => [medication.genericName, medication.category, medication.commonUse, ...medication.brandNames, ...(medication.aliases ?? [])].some((name) => name.toLowerCase().includes(normalized))).slice(0, 5);
+  const filterTerms: Record<MedicationFilter, string[]> = { All: [], Glaucoma: ['pressure', 'prostaglandin', 'beta blocker', 'carbonic', 'alpha agonist', 'rho kinase', 'miotic', 'combination pressure'], 'Dry eye': ['dry-eye', 'lubricant', 'immunomodulator', 'lfa-1'], Allergy: ['allergy', 'antihistamine'], 'Post-op': ['anti-inflammatory', 'antibiotic', 'nonsteroidal'] };
+  const matchesFilter = (medication: CatalogMedication) => filter === 'All' || filterTerms[filter].some((term) => `${medication.category} ${medication.commonUse}`.toLowerCase().includes(term));
+  const matchesQuery = (medication: CatalogMedication) => !normalized || [medication.genericName, medication.category, medication.commonUse, ...medication.brandNames, ...(medication.aliases ?? [])].some((name) => name.toLowerCase().includes(normalized));
+  return MEDICATIONS.filter((medication) => matchesFilter(medication) && matchesQuery(medication)).slice(0, 5);
 }

@@ -3,7 +3,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 import { CatalogMedication, searchMedications } from './data/medications';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AccessibilityInfo, Alert, Animated, AppState, Image, Modal, Pressable, SafeAreaView, ScrollView, Share, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { AccessibilityInfo, Alert, Animated, AppState, Image, Modal, Pressable, ScrollView, Share, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 
 type Eye = 'Left eye' | 'Right eye' | 'Both eyes';
 type Supply = { bottleMl: number; dropsPerApplication: number; applicationsPerDay: number; openedOn: string; warningDays: number; dropsPerMl: number };

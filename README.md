@@ -26,6 +26,11 @@ Local reminder actions and full notification behavior should be tested in an iOS
 
 ## Version history
 
+### v1.18.0 — Save and delete responsiveness
+
+- Removed native notification rebuilding from the automatic save and delete path, preventing those actions from waiting on iOS notification work.
+- When an active routine changes, ClearCue now shows a clear “Refresh reminders” control. The routine is saved immediately; reminder updates happen only when the person deliberately requests them.
+
 ### v1.17.0 — Background-work stability
 
 - Fixed a no-op daily refresh that recreated the medication routine every minute even when completion had not changed.

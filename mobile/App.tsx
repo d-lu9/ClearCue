@@ -915,9 +915,8 @@ export default function App() {
     trackingStart: string;
   } | null>(null);
   const personalReminders = useRef(false);
-  const notificationSync = useRef<Promise<void>>(Promise.resolve());
-  const notificationRevision = useRef(0);
   const [remindersEnabled, setRemindersEnabled] = useState(false);
+  const [remindersNeedRefresh, setRemindersNeedRefresh] = useState(false);
   const [history, setHistory] = useState<DoseLog[]>([]);
   const [showInsights, setShowInsights] = useState(false);
   const homeScrollRef = useRef<ScrollView>(null);
@@ -934,19 +933,6 @@ export default function App() {
   const [guideOpen, setGuideOpen] = useState(false);
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [onboardingVisible, setOnboardingVisible] = useState(false);
-  const notificationPlanKey = useMemo(
-    () =>
-      JSON.stringify(
-        doses.map((dose) => ({
-          id: dose.id,
-          name: dose.name,
-          eye: dose.eye,
-          time: dose.time,
-          supply: dose.supply,
-        })),
-      ),
-    [doses],
-  );
   const [onboardingStep, setOnboardingStep] = useState(0);
   const [launching, setLaunching] = useState(true);
   const splashOpacity = useRef(new Animated.Value(1)).current;
@@ -1056,33 +1042,6 @@ export default function App() {
   useEffect(() => {
     if (hydrated) AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
   }, [settings, hydrated]);
-  useEffect(() => {
-    if (!hydrated || !remindersEnabled || demoMode) return;
-    const revision = ++notificationRevision.current;
-    const routineSnapshot = doses.map((dose) => ({ ...dose }));
-    const timer = setTimeout(() => {
-      notificationSync.current = notificationSync.current
-        .catch(() => undefined)
-        .then(async () => {
-          if (revision !== notificationRevision.current) return;
-          try {
-            await scheduleReminders(
-              routineSnapshot,
-              settings.hideNotificationDetails,
-            );
-          } catch {
-            // A notification failure must never block routine editing or saving.
-          }
-        });
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [
-    notificationPlanKey,
-    hydrated,
-    remindersEnabled,
-    settings.hideNotificationDetails,
-    demoMode,
-  ]);
   useEffect(() => {
     function refreshDailyCompletion() {
       const today = dateKey(new Date());
@@ -1389,6 +1348,7 @@ export default function App() {
     setSelectedMedication(null);
     setEditingDoseId(null);
     setModalOpen(false);
+    if (remindersEnabled) setRemindersNeedRefresh(true);
   }
   function editDose(dose: Dose) {
     const group = doses
@@ -1472,6 +1432,7 @@ export default function App() {
             setEditingDoseId(null);
             setSelectedMedication(null);
             setModalOpen(false);
+            if (remindersEnabled) setRemindersNeedRefresh(true);
           },
         },
       ],
@@ -1502,6 +1463,7 @@ export default function App() {
       settings.hideNotificationDetails,
     );
     setRemindersEnabled(true);
+    setRemindersNeedRefresh(false);
     Alert.alert(
       "Daily reminders are on",
       `${scheduled} reminder${scheduled === 1 ? "" : "s"} will appear at the scheduled times.`,
@@ -1518,6 +1480,7 @@ export default function App() {
       setHistory(demo.history);
       setTrackingStart(demo.trackingStart);
       setRemindersEnabled(false);
+      setRemindersNeedRefresh(false);
       setDemoMode(true);
       return;
     }
@@ -1543,6 +1506,7 @@ export default function App() {
     setDemoMode(false);
     await AsyncStorage.removeItem(DEMO_MODE_KEY);
     setRemindersEnabled(personalReminders.current);
+    setRemindersNeedRefresh(false);
     personalSnapshot.current = null;
   }
   function resetDemoMode() {
@@ -1689,7 +1653,9 @@ export default function App() {
                 {copy.reminders}
               </Text>
               <Text style={[styles.reminderText, scaleText]}>
-                {remindersEnabled
+                {remindersEnabled && remindersNeedRefresh
+                  ? "Routine changes are saved. Refresh reminders when you are ready."
+                  : remindersEnabled
                   ? settings.language === "es"
                     ? "Los recordatorios de ClearCue están activos."
                     : "ClearCue reminders are on."
@@ -1700,7 +1666,9 @@ export default function App() {
             </View>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={remindersEnabled ? copy.synced : copy.enable}
+              accessibilityLabel={
+                remindersNeedRefresh ? "Refresh ClearCue reminders" : remindersEnabled ? copy.synced : copy.enable
+              }
               onPress={() => void enableReminders()}
               style={[
                 styles.reminderButton,
@@ -1708,7 +1676,11 @@ export default function App() {
               ]}
             >
               <Text style={styles.reminderButtonText}>
-                {remindersEnabled ? copy.synced : copy.enable}
+                {remindersNeedRefresh
+                  ? "Refresh"
+                  : remindersEnabled
+                    ? copy.synced
+                    : copy.enable}
               </Text>
             </Pressable>
           </View>

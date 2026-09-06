@@ -39,7 +39,9 @@ type Supply = {
 };
 type PrescriptionDetails = {
   prescriber?: string;
+  prescriberPhone?: string;
   pharmacy?: string;
+  pharmacyPhone?: string;
   rxNumber?: string;
   notes?: string;
 };
@@ -288,6 +290,48 @@ const extraStyles = StyleSheet.create({
   },
   timeOptionText: { color: "#6F625B", fontSize: 12, fontWeight: "800" },
   timeOptionTextSelected: { color: "#B85C4A" },
+  dateMenu: {
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#E7DDD4",
+    borderRadius: 13,
+    padding: 10,
+    gap: 9,
+  },
+  dateMenuHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  dateMonthButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: "#FAF7F2",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  dateMonthButtonText: { color: "#B85C4A", fontSize: 24, lineHeight: 27 },
+  dateMonthLabel: { color: "#3A302B", fontSize: 14, fontWeight: "800" },
+  dateWeekRow: { flexDirection: "row" },
+  dateWeekday: {
+    width: "14.2857%",
+    textAlign: "center",
+    color: "#6F625B",
+    fontSize: 11,
+    fontWeight: "800",
+  },
+  dateGrid: { flexDirection: "row", flexWrap: "wrap" },
+  dateCell: {
+    width: "14.2857%",
+    aspectRatio: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 18,
+  },
+  dateCellSelected: { backgroundColor: "#B85C4A" },
+  dateCellText: { color: "#3A302B", fontSize: 12, fontWeight: "700" },
+  dateCellTextSelected: { color: "#FFFFFF" },
   extraTimes: {
     backgroundColor: "#EFF8F5",
     borderRadius: 14,
@@ -783,7 +827,9 @@ export default function App() {
   const [color, setColor] = useState(COLORS[0]);
   const [taperPlan, setTaperPlan] = useState("");
   const [prescriber, setPrescriber] = useState("");
+  const [prescriberPhone, setPrescriberPhone] = useState("");
   const [pharmacy, setPharmacy] = useState("");
+  const [pharmacyPhone, setPharmacyPhone] = useState("");
   const [rxNumber, setRxNumber] = useState("");
   const [personalNotes, setPersonalNotes] = useState("");
   const [bottleMl, setBottleMl] = useState("");
@@ -1159,12 +1205,16 @@ export default function App() {
       : undefined;
     const prescription =
       prescriber.trim() ||
+      prescriberPhone.trim() ||
       pharmacy.trim() ||
+      pharmacyPhone.trim() ||
       rxNumber.trim() ||
       personalNotes.trim()
         ? {
             prescriber: prescriber.trim() || undefined,
+            prescriberPhone: prescriberPhone.trim() || undefined,
             pharmacy: pharmacy.trim() || undefined,
+            pharmacyPhone: pharmacyPhone.trim() || undefined,
             rxNumber: rxNumber.trim() || undefined,
             notes: personalNotes.trim() || undefined,
           }
@@ -1256,7 +1306,9 @@ export default function App() {
     setColor(dose.color);
     setTaperPlan(dose.taperPlan ?? "");
     setPrescriber(dose.prescription?.prescriber ?? "");
+    setPrescriberPhone(dose.prescription?.prescriberPhone ?? "");
     setPharmacy(dose.prescription?.pharmacy ?? "");
+    setPharmacyPhone(dose.prescription?.pharmacyPhone ?? "");
     setRxNumber(dose.prescription?.rxNumber ?? "");
     setPersonalNotes(dose.prescription?.notes ?? "");
     setBottleMl(dose.supply ? String(dose.supply.bottleMl) : "");
@@ -1276,7 +1328,9 @@ export default function App() {
     setColor(COLORS[0]);
     setTaperPlan("");
     setPrescriber("");
+    setPrescriberPhone("");
     setPharmacy("");
+    setPharmacyPhone("");
     setRxNumber("");
     setPersonalNotes("");
     setBottleMl("");
@@ -1588,7 +1642,9 @@ export default function App() {
           color={color}
           clinicianInstructions={taperPlan}
           prescriber={prescriber}
+          prescriberPhone={prescriberPhone}
           pharmacy={pharmacy}
+          pharmacyPhone={pharmacyPhone}
           rxNumber={rxNumber}
           personalNotes={personalNotes}
           bottleMl={bottleMl}
@@ -1609,7 +1665,13 @@ export default function App() {
           onAdditionalTimes={setAdditionalTimes}
           onClinicianInstructions={setTaperPlan}
           onPrescriber={setPrescriber}
+          onPrescriberPhone={(value) =>
+            setPrescriberPhone(value.replace(/[^0-9+() -]/g, "").slice(0, 20))
+          }
           onPharmacy={setPharmacy}
+          onPharmacyPhone={(value) =>
+            setPharmacyPhone(value.replace(/[^0-9+() -]/g, "").slice(0, 20))
+          }
           onRxNumber={setRxNumber}
           onPersonalNotes={setPersonalNotes}
           onBottleMl={(value) => setBottleMl(value.replace(/[^0-9.]/g, ""))}
@@ -3527,7 +3589,9 @@ type ModalProps = {
   color: string;
   clinicianInstructions: string;
   prescriber: string;
+  prescriberPhone: string;
   pharmacy: string;
+  pharmacyPhone: string;
   rxNumber: string;
   personalNotes: string;
   bottleMl: string;
@@ -3542,7 +3606,9 @@ type ModalProps = {
   onAdditionalTimes: (v: string[]) => void;
   onClinicianInstructions: (v: string) => void;
   onPrescriber: (v: string) => void;
+  onPrescriberPhone: (v: string) => void;
   onPharmacy: (v: string) => void;
+  onPharmacyPhone: (v: string) => void;
   onRxNumber: (v: string) => void;
   onPersonalNotes: (v: string) => void;
   onBottleMl: (v: string) => void;
@@ -3852,12 +3918,38 @@ function AddMedicationModal(props: ModalProps) {
                 style={styles.input}
               />
             </Field>
+            <Field label="Prescriber phone">
+              <TextInput
+                accessibilityLabel="Prescriber phone number"
+                value={props.prescriberPhone}
+                onChangeText={props.onPrescriberPhone}
+                placeholder="e.g. (555) 123-4567"
+                keyboardType="phone-pad"
+                autoComplete="tel"
+                maxLength={20}
+                placeholderTextColor="#81969A"
+                style={styles.input}
+              />
+            </Field>
             <Field label="Pharmacy">
               <TextInput
                 accessibilityLabel="Pharmacy name"
                 value={props.pharmacy}
                 onChangeText={props.onPharmacy}
                 placeholder="e.g. Main Street Pharmacy"
+                placeholderTextColor="#81969A"
+                style={styles.input}
+              />
+            </Field>
+            <Field label="Pharmacy phone">
+              <TextInput
+                accessibilityLabel="Pharmacy phone number"
+                value={props.pharmacyPhone}
+                onChangeText={props.onPharmacyPhone}
+                placeholder="e.g. (555) 123-4567"
+                keyboardType="phone-pad"
+                autoComplete="tel"
+                maxLength={20}
                 placeholderTextColor="#81969A"
                 style={styles.input}
               />
@@ -3937,16 +4029,11 @@ function AddMedicationModal(props: ModalProps) {
                 </Field>
               </View>
             </View>
-            <Field label="Bottle opened (YYYY-MM-DD)">
-              <TextInput
-                accessibilityLabel="Bottle opened date"
-                value={props.openedOn}
-                onChangeText={props.onOpenedOn}
-                placeholder="YYYY-MM-DD"
-                placeholderTextColor="#81969A"
-                style={styles.input}
-              />
-            </Field>
+            <DatePicker
+              label="Bottle opened"
+              value={props.openedOn}
+              onChange={props.onOpenedOn}
+            />
             <Field label="Warn me this many days before estimate">
               <TextInput
                 accessibilityLabel="Refill warning days"
@@ -4110,6 +4197,143 @@ function TimePicker({
             Use a time like 8:30 AM. Your iPhone reminder will use this exact
             time.
           </Text>
+        </View>
+      )}
+    </Field>
+  );
+}
+function DatePicker({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const selectedDate = isValidIsoDate(value)
+    ? new Date(`${value}T00:00:00`)
+    : new Date();
+  const [visibleMonth, setVisibleMonth] = useState(() =>
+    new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1),
+  );
+  const monthLabel = visibleMonth.toLocaleDateString("en-US", {
+    month: "long",
+    year: "numeric",
+  });
+  const leadingDays = visibleMonth.getDay();
+  const daysInMonth = new Date(
+    visibleMonth.getFullYear(),
+    visibleMonth.getMonth() + 1,
+    0,
+  ).getDate();
+  const cells = Array.from({ length: leadingDays + daysInMonth }, (_, index) =>
+    index < leadingDays ? null : index - leadingDays + 1,
+  );
+  const openCalendar = () => {
+    if (!open) {
+      setVisibleMonth(
+        new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1),
+      );
+    }
+    setOpen((current) => !current);
+  };
+  return (
+    <Field label={label}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityState={{ expanded: open }}
+        accessibilityLabel={`${label}: ${value}. Open calendar`}
+        accessibilityHint="Choose the bottle-opened date from a calendar"
+        onPress={openCalendar}
+        style={extraStyles.timePickerButton}
+      >
+        <Text style={extraStyles.timePickerValue}>{value}</Text>
+        <Text style={extraStyles.timePickerArrow}>{open ? "⌃" : "⌄"}</Text>
+      </Pressable>
+      {open && (
+        <View style={extraStyles.dateMenu}>
+          <View style={extraStyles.dateMenuHeader}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Previous month"
+              onPress={() =>
+                setVisibleMonth(
+                  (current) =>
+                    new Date(current.getFullYear(), current.getMonth() - 1, 1),
+                )
+              }
+              style={extraStyles.dateMonthButton}
+            >
+              <Text style={extraStyles.dateMonthButtonText}>‹</Text>
+            </Pressable>
+            <Text style={extraStyles.dateMonthLabel}>{monthLabel}</Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Next month"
+              onPress={() =>
+                setVisibleMonth(
+                  (current) =>
+                    new Date(current.getFullYear(), current.getMonth() + 1, 1),
+                )
+              }
+              style={extraStyles.dateMonthButton}
+            >
+              <Text style={extraStyles.dateMonthButtonText}>›</Text>
+            </Pressable>
+          </View>
+          <View style={extraStyles.dateWeekRow}>
+            {["S", "M", "T", "W", "T", "F", "S"].map((day, index) => (
+              <Text key={`${day}-${index}`} style={extraStyles.dateWeekday}>
+                {day}
+              </Text>
+            ))}
+          </View>
+          <View style={extraStyles.dateGrid}>
+            {cells.map((day, index) =>
+              day === null ? (
+                <View key={`blank-${index}`} style={extraStyles.dateCell} />
+              ) : (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`${monthLabel} ${day}`}
+                  key={day}
+                  onPress={() => {
+                    onChange(
+                      dateKey(
+                        new Date(
+                          visibleMonth.getFullYear(),
+                          visibleMonth.getMonth(),
+                          day,
+                        ),
+                      ),
+                    );
+                    setOpen(false);
+                  }}
+                  style={[
+                    extraStyles.dateCell,
+                    selectedDate.getFullYear() === visibleMonth.getFullYear() &&
+                      selectedDate.getMonth() === visibleMonth.getMonth() &&
+                      selectedDate.getDate() === day &&
+                      extraStyles.dateCellSelected,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      extraStyles.dateCellText,
+                      selectedDate.getFullYear() === visibleMonth.getFullYear() &&
+                        selectedDate.getMonth() === visibleMonth.getMonth() &&
+                        selectedDate.getDate() === day &&
+                        extraStyles.dateCellTextSelected,
+                    ]}
+                  >
+                    {day}
+                  </Text>
+                </Pressable>
+              ),
+            )}
+          </View>
         </View>
       )}
     </Field>
@@ -4287,7 +4511,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   metricValue: { fontSize: 16, fontWeight: "800", color: "#B85C4A" },
-  metricLabel: { fontSize: 10, color: "#6F625B", marginTop: 3 },
+  metricLabel: {
+    alignSelf: "stretch",
+    color: "#6F625B",
+    fontSize: 10,
+    lineHeight: 13,
+    marginTop: 3,
+    textAlign: "center",
+  },
   chartLabel: {
     fontSize: 13,
     fontWeight: "800",

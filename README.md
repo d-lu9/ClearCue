@@ -26,6 +26,12 @@ Local reminder actions and full notification behavior should be tested in an iOS
 
 ## Version history
 
+### v1.15.0 — Routine-entry polish
+
+- Centered multi-line insight labels, including the recorded-day streak, for a more balanced layout.
+- Added optional prescriber and pharmacy phone fields with a phone keypad and sensible input limits.
+- Replaced the active bottle-opened date text field with an accessible in-app calendar picker; the removed contact-lens and glasses prescription expiration forms remain removed to keep ClearCue focused.
+
 ### v1.14.0 — Catalog traceability and beta polish
 
 - Added an optional, medication-specific DailyMed source search from the selected catalog entry; it opens only when a person chooses it and has an internet connection.

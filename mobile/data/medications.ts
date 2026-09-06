@@ -104,5 +104,12 @@ export function searchMedications(query: string, filter: MedicationFilter = 'All
   };
   const matchesFilter = (medication: CatalogMedication) => filter === 'All' || filterTerms[filter].some((term) => `${medication.category} ${medication.commonUse}`.toLowerCase().includes(term));
   const matchesQuery = (medication: CatalogMedication) => !normalized || [medication.genericName, medication.category, medication.commonUse, ...medication.brandNames, ...(medication.aliases ?? [])].some((name) => name.toLowerCase().includes(normalized));
-  return MEDICATIONS.filter((medication) => matchesFilter(medication) && matchesQuery(medication)).slice(0, 5);
+  return MEDICATIONS.filter((medication) => matchesFilter(medication) && matchesQuery(medication));
+}
+
+// Different manufacturers can publish separate current labels for the same
+// medication. A medication-specific DailyMed search is more reliable than
+// pinning a user to one manufacturer or an outdated label version.
+export function medicationDailyMedUrl(medication: CatalogMedication) {
+  return `https://dailymed.nlm.nih.gov/dailymed/search.cfm?query=${encodeURIComponent(medication.genericName)}`;
 }

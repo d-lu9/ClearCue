@@ -26,6 +26,12 @@ Local reminder actions and full notification behavior should be tested in an iOS
 
 ## Version history
 
+### v1.14.0 — Catalog traceability and beta polish
+
+- Added an optional, medication-specific DailyMed source search from the selected catalog entry; it opens only when a person chooses it and has an internet connection.
+- Added a clear “Show all results” control so the growing catalog remains quick to browse without hiding matches.
+- Refined routine wording and filter spacing to avoid the small visual text misalignments in the medication picker.
+
 ### v1.13.0 — Expanded medication use-case browsing
 
 - Expanded the offline catalog to 48 reviewed ophthalmic products and product families, including common lubricant ingredients, allergy treatments, antibiotics, anti-inflammatory drops, and redness relievers.
@@ -45,7 +51,7 @@ ClearCue's medication catalog is a recognition aid, not a clinical reference or 
 - [DailyMed](https://dailymed.nlm.nih.gov/dailymed), operated by the National Library of Medicine, for the current in-use label submitted to the FDA.
 - The FDA's [openFDA drug-label data](https://open.fda.gov/apis/drug/label/), used as a second label-data cross-check.
 
-Catalog changes are reviewed and shipped in app releases rather than downloaded silently to a person's phone. The app shows the source and review date on the selected medication, while the prescription label and clinician remain the only source of medication instructions.
+Catalog changes are reviewed and shipped in app releases rather than downloaded silently to a person's phone. The app shows the source and review date on the selected medication and offers a medication-specific DailyMed source search when the device is online. Because manufacturers can publish separate current labels for the same medication, that search is safer than pinning a person to one manufacturer or an outdated label version. The prescription label and clinician remain the only source of medication instructions.
 
 ### v1.11.0 — Clearer reminder and record language
 

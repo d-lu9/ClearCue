@@ -5,6 +5,7 @@ import {
   CatalogMedication,
   MEDICATION_FILTERS,
   MedicationFilter,
+  medicationDailyMedUrl,
   searchMedications,
 } from "./data/medications";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -15,6 +16,7 @@ import {
   Animated,
   AppState,
   Image,
+  Linking,
   Modal,
   Pressable,
   ScrollView,
@@ -312,7 +314,7 @@ const extraStyles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
   },
   addTimeText: { color: "#B85C4A", fontSize: 13, fontWeight: "800" },
-  filterRow: { flexDirection: "row", flexWrap: "wrap", gap: 7, marginTop: -13 },
+  filterRow: { flexDirection: "row", flexWrap: "wrap", gap: 7 },
   filterChip: {
     borderWidth: 1,
     borderColor: "#E7DDD4",
@@ -3568,7 +3570,11 @@ function RoutineReviewModal({ visible, animation, name, eye, times, clinicianIns
 function AddMedicationModal(props: ModalProps) {
   const [medicationFilter, setMedicationFilter] =
     useState<MedicationFilter>("All");
+  const [showAllSuggestions, setShowAllSuggestions] = useState(false);
   const suggestions = searchMedications(props.name, medicationFilter);
+  const displayedSuggestions = showAllSuggestions
+    ? suggestions
+    : suggestions.slice(0, 5);
   return (
     <Modal
       visible={props.visible}
@@ -3580,7 +3586,7 @@ function AddMedicationModal(props: ModalProps) {
         <View style={styles.modalHeader}>
           <View>
             <Text style={styles.sectionLabel}>
-              {props.isEditing ? "EDIT PRESCRIPTION" : "NEW PRESCRIPTION"}
+              {props.isEditing ? "EDIT ROUTINE" : "NEW ROUTINE"}
             </Text>
             <Text style={styles.modalTitle}>
               {props.isEditing ? "Edit eye drop" : "Add eye drop"}
@@ -3603,40 +3609,49 @@ function AddMedicationModal(props: ModalProps) {
             <TextInput
               accessibilityLabel="Search eye medications"
               value={props.name}
-              onChangeText={props.onName}
+              onChangeText={(value) => {
+                setShowAllSuggestions(false);
+                props.onName(value);
+              }}
               placeholder="Generic, brand, or common name"
               placeholderTextColor="#81969A"
               style={styles.input}
             />
           </Field>
-          <Text style={styles.fieldLabel}>Browse by use</Text>
-          <View style={extraStyles.filterRow}>
-            {MEDICATION_FILTERS.map((filter) => (
-              <Pressable
-                accessibilityRole="radio"
-                accessibilityState={{ selected: medicationFilter === filter }}
-                accessibilityLabel={`Filter medications: ${filter}`}
-                key={filter}
-                onPress={() => setMedicationFilter(filter)}
-                style={[
-                  extraStyles.filterChip,
-                  medicationFilter === filter && extraStyles.filterChipSelected,
-                ]}
-              >
-                <Text
+          <View>
+            <Text style={styles.fieldLabel}>Browse by use</Text>
+            <View style={extraStyles.filterRow}>
+              {MEDICATION_FILTERS.map((filter) => (
+                <Pressable
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected: medicationFilter === filter }}
+                  accessibilityLabel={`Filter medications: ${filter}`}
+                  key={filter}
+                  onPress={() => {
+                    setShowAllSuggestions(false);
+                    setMedicationFilter(filter);
+                  }}
                   style={[
-                    extraStyles.filterChipText,
+                    extraStyles.filterChip,
                     medicationFilter === filter &&
-                      extraStyles.filterChipTextSelected,
+                      extraStyles.filterChipSelected,
                   ]}
                 >
-                  {filter}
-                </Text>
-              </Pressable>
-            ))}
+                  <Text
+                    style={[
+                      extraStyles.filterChipText,
+                      medicationFilter === filter &&
+                        extraStyles.filterChipTextSelected,
+                    ]}
+                  >
+                    {filter}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
           </View>
-          <View style={{ gap: 8, marginTop: -12 }}>
-            {suggestions.map((medication) => (
+          <View style={{ gap: 8 }}>
+            {displayedSuggestions.map((medication) => (
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel={`Choose ${medication.genericName}`}
@@ -3668,6 +3683,18 @@ function AddMedicationModal(props: ModalProps) {
                 </Text>
               </Pressable>
             ))}
+            {suggestions.length > displayedSuggestions.length ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`Show all ${suggestions.length} medication results`}
+                onPress={() => setShowAllSuggestions(true)}
+                style={extraStyles.emptyGuide}
+              >
+                <Text style={extraStyles.cardLink}>
+                  Show all {suggestions.length} results
+                </Text>
+              </Pressable>
+            ) : null}
           </View>
           {props.selectedMedication && (
             <View
@@ -3723,6 +3750,20 @@ function AddMedicationModal(props: ModalProps) {
                 reference · {props.selectedMedication.source} · reviewed{" "}
                 {props.selectedMedication.reviewedOn}
               </Text>
+              <Pressable
+                accessibilityRole="link"
+                accessibilityLabel={`Open DailyMed sources for ${props.selectedMedication.genericName}`}
+                onPress={() => {
+                  void Linking.openURL(
+                    medicationDailyMedUrl(props.selectedMedication!),
+                  );
+                }}
+                style={{ alignSelf: "flex-start", marginTop: 6 }}
+              >
+                <Text style={extraStyles.cardLink}>
+                  View DailyMed sources (requires internet)
+                </Text>
+              </Pressable>
             </View>
           )}
           <TimePicker

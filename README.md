@@ -12,6 +12,10 @@ The native mobile project is in [`mobile/`](mobile).
 
 Local reminder actions and full notification behavior should be tested in an iOS development build before release; Expo Go has notification limitations.
 
+## Current app source
+
+The current ClearCue app is the Expo project in [`mobile/`](mobile). It is the only runnable app source in this repository; the earlier root-level web prototype has been retired so it cannot be mistaken for the current product.
+
 ## Current features
 
 - Local-only eye-drop routines, medication details, refill estimates, and adherence data

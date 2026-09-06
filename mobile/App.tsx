@@ -928,6 +928,7 @@ export default function App() {
     useState<CatalogMedication | null>(null);
   const [hydrated, setHydrated] = useState(false);
   const [demoMode, setDemoMode] = useState(false);
+  const [demoModeNotice, setDemoModeNotice] = useState<string | null>(null);
   const demoTransitionInProgress = useRef(false);
   const reminderUpdateInProgress = useRef(false);
   const routineSaveInProgress = useRef(false);
@@ -1051,7 +1052,9 @@ export default function App() {
   }, []);
   useEffect(() => {
     if (hydrated && !demoMode)
-      AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(doses));
+      void AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(doses)).catch(
+        () => undefined,
+      );
   }, [doses, hydrated, demoMode]);
   useEffect(() => {
     if (!hydrated || demoMode) return;
@@ -1064,14 +1067,21 @@ export default function App() {
   }, [doses.length, hydrated, demoMode]);
   useEffect(() => {
     if (hydrated && !demoMode)
-      AsyncStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+      void AsyncStorage.setItem(HISTORY_KEY, JSON.stringify(history)).catch(
+        () => undefined,
+      );
   }, [history, hydrated, demoMode]);
   useEffect(() => {
     if (hydrated && !demoMode)
-      AsyncStorage.setItem(TRACKING_START_KEY, trackingStart);
+      void AsyncStorage.setItem(TRACKING_START_KEY, trackingStart).catch(
+        () => undefined,
+      );
   }, [trackingStart, hydrated, demoMode]);
   useEffect(() => {
-    if (hydrated) AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+    if (hydrated)
+      void AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)).catch(
+        () => undefined,
+      );
   }, [settings, hydrated]);
   useEffect(() => {
     function refreshDailyCompletion() {
@@ -1510,6 +1520,7 @@ export default function App() {
   async function toggleDemoMode(enabled: boolean) {
     if (demoTransitionInProgress.current) return;
     demoTransitionInProgress.current = true;
+    setDemoModeNotice(null);
     try {
       if (enabled) {
         personalSnapshot.current = { doses, history, trackingStart };
@@ -1560,9 +1571,8 @@ export default function App() {
         // The restored personal routine remains usable even if the demo flag clears on the next launch.
       }
     } catch {
-      Alert.alert(
-        "Could not switch modes",
-        "Your current routine is still unchanged. Close and reopen ClearCue, then try again.",
+      setDemoModeNotice(
+        "ClearCue could not switch modes. Your current routine is unchanged; close and reopen the app, then try again.",
       );
     } finally {
       demoTransitionInProgress.current = false;
@@ -1969,6 +1979,8 @@ export default function App() {
           setSettingsOpen(false);
         }}
         demoMode={demoMode}
+        notice={demoModeNotice}
+        onDismissNotice={() => setDemoModeNotice(null)}
         onDemoMode={(enabled) => void toggleDemoMode(enabled)}
         onResetDemo={resetDemoMode}
         onClose={() => setSettingsOpen(false)}
@@ -1993,7 +2005,9 @@ export default function App() {
         onComplete={() => {
           setOnboardingVisible(false);
           setOnboardingStep(0);
-          void AsyncStorage.setItem(ONBOARDING_KEY, "complete");
+          void AsyncStorage.setItem(ONBOARDING_KEY, "complete").catch(
+            () => undefined,
+          );
         }}
       />
     </>
@@ -3420,6 +3434,8 @@ function SettingsModal({
   onChange,
   onShowOnboarding,
   demoMode,
+  notice,
+  onDismissNotice,
   onDemoMode,
   onResetDemo,
   onClose,
@@ -3431,6 +3447,8 @@ function SettingsModal({
   onChange: (settings: AppSettings) => void;
   onShowOnboarding: () => void;
   demoMode: boolean;
+  notice: string | null;
+  onDismissNotice: () => void;
   onDemoMode: (enabled: boolean) => void;
   onResetDemo: () => void;
   onClose: () => void;
@@ -3490,6 +3508,20 @@ function SettingsModal({
             value={demoMode}
             onChange={onDemoMode}
           />
+          {notice && (
+            <View style={extraStyles.deleteConfirm}>
+              <Text style={extraStyles.eraseTitle}>Demo Mode did not change</Text>
+              <Text style={extraStyles.eraseText}>{notice}</Text>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Dismiss Demo Mode message"
+                onPress={onDismissNotice}
+                style={styles.choice}
+              >
+                <Text style={styles.choiceText}>OK</Text>
+              </Pressable>
+            </View>
+          )}
           {demoMode && (
             <Pressable
               accessibilityRole="button"

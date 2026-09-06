@@ -26,6 +26,11 @@ Local reminder actions and full notification behavior should be tested in an iOS
 
 ## Version history
 
+### v1.22.0 — Cohesive interaction safeguards
+
+- Audited active app interactions for overlapping sheets, native alert interruptions, repeated taps, and competing device work.
+- Kept actionable messages inside their active screen and made background storage operations non-interrupting, so routine updates stay responsive even if a background write fails.
+
 ### v1.21.0 — Normal-mode interruption audit
 
 - Made Demo Mode switch to its visible routine immediately and isolated notification and storage cleanup from the interaction; duplicate mode and reminder operations are ignored while one is already in progress.

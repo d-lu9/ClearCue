@@ -26,6 +26,11 @@ Local reminder actions and full notification behavior should be tested in an iOS
 
 ## Version history
 
+### v1.19.0 — Native sheet reliability
+
+- Prevented the review sheet from being presented over the still-open edit sheet on iOS; routine review now follows a clean sheet transition.
+- Replaced the native deletion alert with an in-sheet confirmation, keeping deletion responsive in Demo Mode and on device.
+
 ### v1.18.0 — Save and delete responsiveness
 
 - Removed native notification rebuilding from the automatic save and delete path, preventing those actions from waiting on iOS notification work.

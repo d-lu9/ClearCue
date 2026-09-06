@@ -516,6 +516,20 @@ const extraStyles = StyleSheet.create({
     marginTop: 5,
   },
   eraseButtonText: { color: "#B3362D", fontSize: 13, fontWeight: "800" },
+  deleteConfirm: {
+    backgroundColor: "#FBE7E4",
+    borderRadius: 14,
+    padding: 15,
+    gap: 9,
+  },
+  deleteConfirmButton: {
+    flex: 1,
+    alignItems: "center",
+    backgroundColor: "#B3362D",
+    borderRadius: 11,
+    padding: 12,
+  },
+  deleteConfirmButtonText: { color: "#FFFFFF", fontWeight: "800" },
   quickTools: { gap: 9, marginTop: 18 },
   homeAction: {
     flexDirection: "row",
@@ -925,6 +939,7 @@ export default function App() {
   const [reportOpen, setReportOpen] = useState(false);
   const [routineReviewOpen, setRoutineReviewOpen] = useState(false);
   const [routineConfirmed, setRoutineConfirmed] = useState(false);
+  const [deleteConfirming, setDeleteConfirming] = useState(false);
   const [careToolsOpen, setCareToolsOpen] = useState(false);
   const [historyDoseId, setHistoryDoseId] = useState<string | null>(null);
   const [reportDays, setReportDays] = useState<7 | 30>(7);
@@ -1253,6 +1268,7 @@ export default function App() {
   }
   function openRoutineReview() {
     setRoutineConfirmed(false);
+    setModalOpen(false);
     setRoutineReviewOpen(true);
   }
   function persistDose() {
@@ -1347,6 +1363,7 @@ export default function App() {
     setWarningDays("7");
     setSelectedMedication(null);
     setEditingDoseId(null);
+    setDeleteConfirming(false);
     setModalOpen(false);
     if (remindersEnabled) setRemindersNeedRefresh(true);
   }
@@ -1383,6 +1400,7 @@ export default function App() {
     setOpenedOn(dose.supply?.openedOn ?? dateKey(new Date()));
     setWarningDays(String(dose.supply?.warningDays ?? 7));
     setSelectedMedication(null);
+    setDeleteConfirming(false);
     setModalOpen(true);
   }
   function startAddingDose() {
@@ -1405,38 +1423,29 @@ export default function App() {
     setOpenedOn(dateKey(new Date()));
     setWarningDays("7");
     setSelectedMedication(null);
+    setDeleteConfirming(false);
     setModalOpen(true);
   }
   function deleteEditingDose() {
     if (!editingDoseId) return;
+    setDeleteConfirming(true);
+  }
+  function confirmDeleteEditingDose() {
+    if (!editingDoseId) return;
     const dose = doses.find((item) => item.id === editingDoseId);
     const groupId = dose?.scheduleGroupId ?? editingDoseId;
-    Alert.alert(
-      "Remove this eye drop?",
-      `${dose?.name ?? "This medication"} and all of its daily reminder times will be removed from the routine.`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Remove",
-          style: "destructive",
-          onPress: () => {
-            const ids = doses
-              .filter((item) => (item.scheduleGroupId ?? item.id) === groupId)
-              .map((item) => item.id);
-            setDoses((current) =>
-              current.filter((item) => !ids.includes(item.id)),
-            );
-            setHistory((current) =>
-              current.filter((log) => !ids.includes(log.doseId)),
-            );
-            setEditingDoseId(null);
-            setSelectedMedication(null);
-            setModalOpen(false);
-            if (remindersEnabled) setRemindersNeedRefresh(true);
-          },
-        },
-      ],
+    const ids = doses
+      .filter((item) => (item.scheduleGroupId ?? item.id) === groupId)
+      .map((item) => item.id);
+    setDoses((current) => current.filter((item) => !ids.includes(item.id)));
+    setHistory((current) =>
+      current.filter((log) => !ids.includes(log.doseId)),
     );
+    setEditingDoseId(null);
+    setSelectedMedication(null);
+    setDeleteConfirming(false);
+    setModalOpen(false);
+    if (remindersEnabled) setRemindersNeedRefresh(true);
   }
   async function enableReminders() {
     if (demoMode) {
@@ -1730,6 +1739,7 @@ export default function App() {
           applicationsPerDay={applicationsPerDay}
           openedOn={openedOn}
           warningDays={warningDays}
+          deleteConfirming={deleteConfirming}
           selectedMedication={selectedMedication}
           onName={(value) => {
             setName(value);
@@ -1768,6 +1778,8 @@ export default function App() {
           onClose={() => setModalOpen(false)}
           onSave={saveDose}
           onDelete={deleteEditingDose}
+          onCancelDelete={() => setDeleteConfirming(false)}
+          onConfirmDelete={confirmDeleteEditingDose}
         />
       </SafeAreaView>
       <RoutineReviewModal
@@ -1784,7 +1796,10 @@ export default function App() {
         warningDays={warningDays}
         confirmed={routineConfirmed}
         onConfirmed={setRoutineConfirmed}
-        onBack={() => setRoutineReviewOpen(false)}
+        onBack={() => {
+          setRoutineReviewOpen(false);
+          setTimeout(() => setModalOpen(true), 250);
+        }}
         onSave={() => {
           setRoutineReviewOpen(false);
           persistDose();
@@ -3680,6 +3695,7 @@ type ModalProps = {
   applicationsPerDay: string;
   openedOn: string;
   warningDays: string;
+  deleteConfirming: boolean;
   selectedMedication: CatalogMedication | null;
   onName: (v: string) => void;
   onSelectMedication: (medication: CatalogMedication) => void;
@@ -3702,6 +3718,8 @@ type ModalProps = {
   onClose: () => void;
   onSave: () => void;
   onDelete: () => void;
+  onCancelDelete: () => void;
+  onConfirmDelete: () => void;
 };
 function RoutineReviewModal({ visible, animation, name, eye, times, clinicianInstructions, bottleMl, dropsPerApplication, applicationsPerDay, openedOn, warningDays, confirmed, onConfirmed, onBack, onSave }: { visible: boolean; animation: "none" | "slide"; name: string; eye: Eye; times: string[]; clinicianInstructions: string; bottleMl: string; dropsPerApplication: string; applicationsPerDay: string; openedOn: string; warningDays: string; confirmed: boolean; onConfirmed: (value: boolean) => void; onBack: () => void; onSave: () => void }) {
   const warnings: string[] = [];
@@ -4191,18 +4209,45 @@ function AddMedicationModal(props: ModalProps) {
               {props.isEditing ? "Save changes" : "Add to my routine"}
             </Text>
           </Pressable>
-          {props.isEditing && (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Remove this medication"
-              onPress={props.onDelete}
-              style={{ padding: 14, alignItems: "center" }}
-            >
-              <Text style={{ color: "#B3362D", fontWeight: "800" }}>
-                Remove this eye drop
-              </Text>
-            </Pressable>
-          )}
+          {props.isEditing &&
+            (props.deleteConfirming ? (
+              <View style={extraStyles.deleteConfirm}>
+                <Text style={extraStyles.eraseTitle}>Remove this eye drop?</Text>
+                <Text style={extraStyles.eraseText}>
+                  This removes all of this medication’s daily reminder times
+                  from the routine.
+                </Text>
+                <View style={styles.choiceRow}>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Keep this medication"
+                    onPress={props.onCancelDelete}
+                    style={styles.choice}
+                  >
+                    <Text style={styles.choiceText}>Keep</Text>
+                  </Pressable>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Confirm removal of this medication"
+                    onPress={props.onConfirmDelete}
+                    style={extraStyles.deleteConfirmButton}
+                  >
+                    <Text style={extraStyles.deleteConfirmButtonText}>Remove</Text>
+                  </Pressable>
+                </View>
+              </View>
+            ) : (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Remove this medication"
+                onPress={props.onDelete}
+                style={{ padding: 14, alignItems: "center" }}
+              >
+                <Text style={{ color: "#B3362D", fontWeight: "800" }}>
+                  Remove this eye drop
+                </Text>
+              </Pressable>
+            ))}
         </ScrollView>
       </SafeAreaView>
     </Modal>

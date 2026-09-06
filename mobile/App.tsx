@@ -834,27 +834,25 @@ async function scheduleReminders(
     .filter(
       (item): item is { dose: Dose; clock: { hour: number; minute: number } } =>
         item.clock !== null,
-    );
-  await Promise.all(
-    validDoses.map(({ dose, clock }) =>
-      Notifications.scheduleNotificationAsync({
-        content: {
-          title: "ClearCue reminder",
-          body: hideNotificationDetails
-            ? "A scheduled eye-drop reminder is due."
-            : `${dose.name} · ${dose.eye}`,
-          sound: "default",
-          categoryIdentifier: DOSE_REMINDER_CATEGORY,
-          data: { doseId: dose.id },
-        },
-        trigger: {
-          type: Notifications.SchedulableTriggerInputTypes.DAILY,
-          hour: clock.hour,
-          minute: clock.minute,
-        },
-      }),
-    ),
   );
+  for (const { dose, clock } of validDoses) {
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: "ClearCue reminder",
+        body: hideNotificationDetails
+          ? "A scheduled eye-drop reminder is due."
+          : `${dose.name} · ${dose.eye}`,
+        sound: "default",
+        categoryIdentifier: DOSE_REMINDER_CATEGORY,
+        data: { doseId: dose.id },
+      },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.DAILY,
+        hour: clock.hour,
+        minute: clock.minute,
+      },
+    });
+  }
   const refillDates = doses
     .map((dose) => ({ dose, estimate: supplyEstimate(dose.supply) }))
     .filter(
@@ -866,25 +864,23 @@ async function scheduleReminders(
       } =>
         item.estimate !== null &&
         item.estimate.warningDate.getTime() > Date.now(),
-    );
-  await Promise.all(
-    refillDates.map(({ dose, estimate }) =>
-      Notifications.scheduleNotificationAsync({
-        content: {
-          title: "ClearCue refill estimate",
-          body: hideNotificationDetails
-            ? "A medication supply estimate needs your attention."
-            : `${dose.name} may be running low. Confirm your refill with your pharmacy or clinician.`,
-          sound: "default",
-          data: { doseId: dose.id, kind: "refill-estimate" },
-        },
-        trigger: {
-          type: Notifications.SchedulableTriggerInputTypes.DATE,
-          date: estimate.warningDate,
-        },
-      }),
-    ),
   );
+  for (const { dose, estimate } of refillDates) {
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: "ClearCue refill estimate",
+        body: hideNotificationDetails
+          ? "A medication supply estimate needs your attention."
+          : `${dose.name} may be running low. Confirm your refill with your pharmacy or clinician.`,
+        sound: "default",
+        data: { doseId: dose.id, kind: "refill-estimate" },
+      },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.DATE,
+        date: estimate.warningDate,
+      },
+    });
+  }
   return validDoses.length;
 }
 
@@ -938,6 +934,19 @@ export default function App() {
   const [guideOpen, setGuideOpen] = useState(false);
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [onboardingVisible, setOnboardingVisible] = useState(false);
+  const notificationPlanKey = useMemo(
+    () =>
+      JSON.stringify(
+        doses.map((dose) => ({
+          id: dose.id,
+          name: dose.name,
+          eye: dose.eye,
+          time: dose.time,
+          supply: dose.supply,
+        })),
+      ),
+    [doses],
+  );
   const [onboardingStep, setOnboardingStep] = useState(0);
   const [launching, setLaunching] = useState(true);
   const splashOpacity = useRef(new Animated.Value(1)).current;
@@ -1051,21 +1060,24 @@ export default function App() {
     if (!hydrated || !remindersEnabled || demoMode) return;
     const revision = ++notificationRevision.current;
     const routineSnapshot = doses.map((dose) => ({ ...dose }));
-    notificationSync.current = notificationSync.current
-      .catch(() => undefined)
-      .then(async () => {
-        if (revision !== notificationRevision.current) return;
-        try {
-          await scheduleReminders(
-            routineSnapshot,
-            settings.hideNotificationDetails,
-          );
-        } catch {
-          // A notification failure must never block routine editing or saving.
-        }
-      });
+    const timer = setTimeout(() => {
+      notificationSync.current = notificationSync.current
+        .catch(() => undefined)
+        .then(async () => {
+          if (revision !== notificationRevision.current) return;
+          try {
+            await scheduleReminders(
+              routineSnapshot,
+              settings.hideNotificationDetails,
+            );
+          } catch {
+            // A notification failure must never block routine editing or saving.
+          }
+        });
+    }, 300);
+    return () => clearTimeout(timer);
   }, [
-    doses,
+    notificationPlanKey,
     hydrated,
     remindersEnabled,
     settings.hideNotificationDetails,
@@ -1074,14 +1086,18 @@ export default function App() {
   useEffect(() => {
     function refreshDailyCompletion() {
       const today = dateKey(new Date());
-      setDoses((current) =>
-        current.map((dose) => ({
-          ...dose,
-          completed: history.some(
+      setDoses((current) => {
+        let changed = false;
+        const next = current.map((dose) => {
+          const completed = history.some(
             (log) => log.doseId === dose.id && log.date === today,
-          ),
-        })),
-      );
+          );
+          if (dose.completed === completed) return dose;
+          changed = true;
+          return { ...dose, completed };
+        });
+        return changed ? next : current;
+      });
     }
     const appStateSubscription = AppState.addEventListener(
       "change",

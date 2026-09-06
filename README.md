@@ -26,6 +26,12 @@ Local reminder actions and full notification behavior should be tested in an iOS
 
 ## Version history
 
+### v1.17.0 — Background-work stability
+
+- Fixed a no-op daily refresh that recreated the medication routine every minute even when completion had not changed.
+- Limited reminder rescheduling to actual schedule, supply, or notification-detail changes rather than dose-history updates.
+- Deferred and serialized native notification work, and scheduled notifications one at a time to avoid flooding the device after a routine update.
+
 ### v1.16.0 — Editing reliability and custom-time controls
 
 - Serialized reminder rescheduling after routine edits so notification work cannot overlap or block the save experience.

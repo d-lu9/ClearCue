@@ -26,6 +26,12 @@ Local reminder actions and full notification behavior should be tested in an iOS
 
 ## Version history
 
+### v1.16.0 — Editing reliability and custom-time controls
+
+- Serialized reminder rescheduling after routine edits so notification work cannot overlap or block the save experience.
+- Added a clock-style custom-time picker with hour dial, five-minute selections, AM/PM controls, and precise manual entry.
+- Moved the Spanish-support note below the language choices with intentional spacing.
+
 ### v1.15.0 — Routine-entry polish
 
 - Centered multi-line insight labels, including the recorded-day streak, for a more balanced layout.

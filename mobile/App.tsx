@@ -290,6 +290,67 @@ const extraStyles = StyleSheet.create({
   },
   timeOptionText: { color: "#6F625B", fontSize: 12, fontWeight: "800" },
   timeOptionTextSelected: { color: "#B85C4A" },
+  clockPicker: {
+    alignItems: "center",
+    backgroundColor: "#FAF7F2",
+    borderRadius: 12,
+    padding: 10,
+    gap: 9,
+  },
+  clockDial: {
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+    borderWidth: 1,
+    borderColor: "#E7DDD4",
+    backgroundColor: "#FFFFFF",
+    position: "relative",
+  },
+  clockHour: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    position: "absolute",
+  },
+  clockHourSelected: { backgroundColor: "#B85C4A" },
+  clockHourText: { color: "#3A302B", fontSize: 12, fontWeight: "800" },
+  clockHourTextSelected: { color: "#FFFFFF" },
+  clockCenterText: {
+    alignSelf: "center",
+    color: "#B85C4A",
+    fontSize: 15,
+    fontWeight: "800",
+    marginTop: 88,
+  },
+  clockMinuteRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+    justifyContent: "center",
+  },
+  clockMinute: {
+    width: 39,
+    borderRadius: 9,
+    paddingVertical: 7,
+    alignItems: "center",
+    backgroundColor: "#FFFFFF",
+  },
+  clockMinuteSelected: { backgroundColor: "#F5E5D8", borderWidth: 1, borderColor: "#B85C4A" },
+  clockMinuteText: { color: "#6F625B", fontSize: 12, fontWeight: "800" },
+  clockMinuteTextSelected: { color: "#B85C4A" },
+  clockPeriodRow: { flexDirection: "row", gap: 8 },
+  clockPeriod: {
+    minWidth: 78,
+    alignItems: "center",
+    borderRadius: 10,
+    paddingVertical: 8,
+    backgroundColor: "#FFFFFF",
+  },
+  clockPeriodSelected: { backgroundColor: "#F5E5D8", borderWidth: 1, borderColor: "#B85C4A" },
+  clockPeriodText: { color: "#6F625B", fontSize: 12, fontWeight: "800" },
+  clockPeriodTextSelected: { color: "#B85C4A" },
   dateMenu: {
     backgroundColor: "#FFFFFF",
     borderWidth: 1,
@@ -359,6 +420,12 @@ const extraStyles = StyleSheet.create({
   },
   addTimeText: { color: "#B85C4A", fontSize: 13, fontWeight: "800" },
   filterRow: { flexDirection: "row", flexWrap: "wrap", gap: 7 },
+  languageSupportNote: {
+    color: "#6F625B",
+    fontSize: 11,
+    lineHeight: 16,
+    marginTop: 10,
+  },
   filterChip: {
     borderWidth: 1,
     borderColor: "#E7DDD4",
@@ -587,6 +654,11 @@ function parseReminderTime(value: string) {
   if (period === "PM" && hour !== 12) hour += 12;
   if (period === "AM" && hour === 12) hour = 0;
   return { hour, minute };
+}
+function formatReminderTime(hour: number, minute: number) {
+  const period = hour >= 12 ? "PM" : "AM";
+  const displayHour = hour % 12 || 12;
+  return `${displayHour}:${String(minute).padStart(2, "0")} ${period}`;
 }
 
 function dateKey(date: Date) {
@@ -847,6 +919,8 @@ export default function App() {
     trackingStart: string;
   } | null>(null);
   const personalReminders = useRef(false);
+  const notificationSync = useRef<Promise<void>>(Promise.resolve());
+  const notificationRevision = useRef(0);
   const [remindersEnabled, setRemindersEnabled] = useState(false);
   const [history, setHistory] = useState<DoseLog[]>([]);
   const [showInsights, setShowInsights] = useState(false);
@@ -974,8 +1048,22 @@ export default function App() {
     if (hydrated) AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
   }, [settings, hydrated]);
   useEffect(() => {
-    if (hydrated && remindersEnabled && !demoMode)
-      void scheduleReminders(doses, settings.hideNotificationDetails);
+    if (!hydrated || !remindersEnabled || demoMode) return;
+    const revision = ++notificationRevision.current;
+    const routineSnapshot = doses.map((dose) => ({ ...dose }));
+    notificationSync.current = notificationSync.current
+      .catch(() => undefined)
+      .then(async () => {
+        if (revision !== notificationRevision.current) return;
+        try {
+          await scheduleReminders(
+            routineSnapshot,
+            settings.hideNotificationDetails,
+          );
+        } catch {
+          // A notification failure must never block routine editing or saving.
+        }
+      });
   }, [
     doses,
     hydrated,
@@ -1272,7 +1360,9 @@ export default function App() {
     setColor(COLORS[0]);
     setTaperPlan("");
     setPrescriber("");
+    setPrescriberPhone("");
     setPharmacy("");
+    setPharmacyPhone("");
     setRxNumber("");
     setPersonalNotes("");
     setBottleMl("");
@@ -3331,7 +3421,10 @@ function SettingsModal({
                 </Pressable>
               ))}
             </View>
-            <Text style={extraStyles.supplyHelp}>Spanish currently covers the home screen and core routine status. Full-app Spanish is in progress.</Text>
+            <Text style={extraStyles.languageSupportNote}>
+              Spanish currently covers the home screen and core routine status.
+              Full-app Spanish is in progress.
+            </Text>
           </View>
           <View style={styles.note}>
             <Text style={styles.noteTitle}>Color-safe labels</Text>
@@ -4183,23 +4276,143 @@ function TimePicker({
             ))}
           </View>
           <Text style={[styles.fieldLabel, { marginTop: 5 }]}>
-            Or enter a custom time
+            Or set a custom time
           </Text>
+          <ClockDial value={value} onChange={onChange} />
           <TextInput
             accessibilityLabel={`Custom ${label.toLowerCase()}`}
             value={value}
             onChangeText={onChange}
-            placeholder="e.g. 8:30 AM"
+            placeholder="Or type e.g. 8:30 AM"
             placeholderTextColor="#81969A"
             style={styles.input}
           />
           <Text style={extraStyles.supplyHelp}>
-            Use a time like 8:30 AM. Your iPhone reminder will use this exact
-            time.
+            Choose an hour, minutes, and AM/PM—or type a precise time. Your
+            iPhone reminder will use this exact time.
           </Text>
         </View>
       )}
     </Field>
+  );
+}
+function ClockDial({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const clock = parseReminderTime(value) ?? { hour: 9, minute: 0 };
+  const displayHour = clock.hour % 12 || 12;
+  const period = clock.hour >= 12 ? "PM" : "AM";
+  const setTime = (hour: number, minute = clock.minute) =>
+    onChange(formatReminderTime(hour, minute));
+  return (
+    <View style={extraStyles.clockPicker}>
+      <Text style={extraStyles.supplyHelp}>Tap the clock to choose an hour</Text>
+      <View style={extraStyles.clockDial}>
+        {Array.from({ length: 12 }, (_, index) => index + 1).map((hour) => {
+          const angle = ((hour % 12) * Math.PI) / 6 - Math.PI / 2;
+          const radius = 82;
+          return (
+            <Pressable
+              accessibilityRole="radio"
+              accessibilityState={{ selected: displayHour === hour }}
+              accessibilityLabel={`${hour} ${period}`}
+              key={hour}
+              onPress={() =>
+                setTime(
+                  period === "PM" && hour !== 12
+                    ? hour + 12
+                    : period === "AM" && hour === 12
+                      ? 0
+                      : hour,
+                )
+              }
+              style={[
+                extraStyles.clockHour,
+                {
+                  left: 100 + Math.cos(angle) * radius - 18,
+                  top: 100 + Math.sin(angle) * radius - 18,
+                },
+                displayHour === hour && extraStyles.clockHourSelected,
+              ]}
+            >
+              <Text
+                style={[
+                  extraStyles.clockHourText,
+                  displayHour === hour && extraStyles.clockHourTextSelected,
+                ]}
+              >
+                {hour}
+              </Text>
+            </Pressable>
+          );
+        })}
+        <Text style={extraStyles.clockCenterText}>
+          {formatReminderTime(clock.hour, clock.minute)}
+        </Text>
+      </View>
+      <View style={extraStyles.clockMinuteRow}>
+        {[0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55].map((minute) => (
+          <Pressable
+            accessibilityRole="radio"
+            accessibilityState={{ selected: clock.minute === minute }}
+            accessibilityLabel={`${String(minute).padStart(2, "0")} minutes`}
+            key={minute}
+            onPress={() => setTime(clock.hour, minute)}
+            style={[
+              extraStyles.clockMinute,
+              clock.minute === minute && extraStyles.clockMinuteSelected,
+            ]}
+          >
+            <Text
+              style={[
+                extraStyles.clockMinuteText,
+                clock.minute === minute && extraStyles.clockMinuteTextSelected,
+              ]}
+            >
+              {String(minute).padStart(2, "0")}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+      <View style={extraStyles.clockPeriodRow}>
+        {(["AM", "PM"] as const).map((nextPeriod) => (
+          <Pressable
+            accessibilityRole="radio"
+            accessibilityState={{ selected: period === nextPeriod }}
+            accessibilityLabel={nextPeriod}
+            key={nextPeriod}
+            onPress={() =>
+              setTime(
+                nextPeriod === "PM"
+                  ? displayHour === 12
+                    ? 12
+                    : displayHour + 12
+                  : displayHour === 12
+                    ? 0
+                    : displayHour,
+              )
+            }
+            style={[
+              extraStyles.clockPeriod,
+              period === nextPeriod && extraStyles.clockPeriodSelected,
+            ]}
+          >
+            <Text
+              style={[
+                extraStyles.clockPeriodText,
+                period === nextPeriod && extraStyles.clockPeriodTextSelected,
+              ]}
+            >
+              {nextPeriod}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+    </View>
   );
 }
 function DatePicker({

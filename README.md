@@ -14,22 +14,26 @@ Local reminder actions and full notification behavior should be tested in an iOS
 
 ## Current features
 
-- Local-only eye-drop routines, prescription details, contact-lens and glasses references, and adherence data
+- Local-only eye-drop routines, medication details, refill estimates, and adherence data
 - Multiple daily reminder times for a single medication, with safe spacing warnings
 - Time picker, medication search, brand/alias support, and category filters
 - Daily adherence history, weekly insights, refill estimates, and clinician-shareable reports
-- Contact-lens expiration and replacement-plan reminders
 - Clinician-safe “How to use drops” guide, including urgent-symptoms guidance
 - Accessibility defaults: large text, high contrast, VoiceOver labels, reduced motion, color-safe labels, and core Spanish home-screen labels
 - Demo Mode, onboarding, app icon/splash screen, and device-only privacy controls
-- A focused home screen that prioritizes today’s eye-drop routine; reports, prescription references, privacy, and accessibility are grouped under More care tools
+- A focused home screen that prioritizes today’s eye-drop routine; reports, privacy, and accessibility are grouped under More care tools
 
 ## Version history
+
+### v1.9.0 — Focused eye-drop routine
+
+- Removed contact-lens and glasses-prescription records, including their reference forms and reminders.
+- Simplified supporting tools to keep ClearCue centered on taking eye drops reliably.
 
 ### v1.8.0 — Focused routine dashboard
 
 - Simplified the home screen around daily progress, today’s schedule, reminders, and adding an eye drop.
-- Moved insights, prescription references, privacy controls, and accessibility settings into a single Care & settings sheet.
+- Moved insights, privacy controls, and accessibility settings into a single Care & settings sheet.
 
 ### v1.7.0 — Glasses prescription reference
 

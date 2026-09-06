@@ -17,7 +17,7 @@ Local reminder actions and full notification behavior should be tested in an iOS
 - Local-only eye-drop routines, medication details, refill estimates, and adherence data
 - Multiple daily reminder times for a single medication, with safe spacing warnings
 - Validated supply-estimate fields, date checks, and a required clinician-plan confirmation before routine changes are saved
-- Time picker, medication search, brand/alias support, and category filters
+- Time picker, medication search, brand/alias support, category filters, and a reviewed offline catalog of common glaucoma, dry-eye, allergy, and clinician-directed post-operative drops
 - Self-reported dose history, weekly routine insights, refill estimates, and shareable summaries
 - Clinician-safe “How to use drops” guide, including urgent-symptoms guidance
 - Accessibility defaults: large text, high contrast, VoiceOver labels, reduced motion, color-safe labels, and Spanish home-screen support; full-app Spanish is in progress
@@ -25,6 +25,21 @@ Local reminder actions and full notification behavior should be tested in an iOS
 - A focused home screen that prioritizes today’s eye-drop routine; reports, privacy, and accessibility are grouped under More care tools
 
 ## Version history
+
+### v1.12.0 — Reviewed offline medication catalog
+
+- Expanded the bundled recognition catalog with common glaucoma and ocular-hypertension drops (including combination products), dry-eye treatments, allergy drops, and clinician-directed anti-inflammatory and antibiotic drops.
+- Every catalog entry now identifies its source as the current [DailyMed](https://dailymed.nlm.nih.gov/dailymed) label, cross-checked against the FDA's [openFDA drug-label data](https://open.fda.gov/apis/drug/label/), with a visible review date.
+- Kept catalog data offline, versioned with the app, and intentionally free of dosing directions, contraindication guidance, or treatment recommendations.
+
+## Medication catalog sources and updates
+
+ClearCue's medication catalog is a recognition aid, not a clinical reference or dosing tool. Each release reviews the bundled entries against two official U.S. sources:
+
+- [DailyMed](https://dailymed.nlm.nih.gov/dailymed), operated by the National Library of Medicine, for the current in-use label submitted to the FDA.
+- The FDA's [openFDA drug-label data](https://open.fda.gov/apis/drug/label/), used as a second label-data cross-check.
+
+Catalog changes are reviewed and shipped in app releases rather than downloaded silently to a person's phone. The app shows the source and review date on the selected medication, while the prescription label and clinician remain the only source of medication instructions.
 
 ### v1.11.0 — Clearer reminder and record language
 
@@ -92,4 +107,4 @@ Local reminder actions and full notification behavior should be tested in an iOS
 
 ## Next milestone
 
-- Expand the offline eye-medication catalog with carefully reviewed source data before considering a connected prescription database.
+- Establish a recurring review process for the bundled medication catalog and continue improving the focused eye-drop routine experience.

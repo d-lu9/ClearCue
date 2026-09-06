@@ -16,6 +16,7 @@ Local reminder actions and full notification behavior should be tested in an iOS
 
 - Local-only eye-drop routines, medication details, refill estimates, and adherence data
 - Multiple daily reminder times for a single medication, with safe spacing warnings
+- Validated supply-estimate fields, date checks, and a required clinician-plan confirmation before routine changes are saved
 - Time picker, medication search, brand/alias support, and category filters
 - Daily adherence history, weekly insights, refill estimates, and clinician-shareable reports
 - Clinician-safe “How to use drops” guide, including urgent-symptoms guidance
@@ -24,6 +25,12 @@ Local reminder actions and full notification behavior should be tested in an iOS
 - A focused home screen that prioritizes today’s eye-drop routine; reports, privacy, and accessibility are grouped under More care tools
 
 ## Version history
+
+### v1.10.0 — Safer routine entry
+
+- Added numeric and real-date checks for supply estimates, while preserving room for unusual but valid clinician instructions.
+- Added a read-only routine review with required confirmation against the clinician’s prescription before saving.
+- Added warnings for reminder-count mismatches and future or unusually old bottle-opened dates.
 
 ### v1.9.0 — Focused eye-drop routine
 

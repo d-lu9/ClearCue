@@ -664,6 +664,17 @@ function minutesBetween(first: string, second: string) {
   );
   return Math.min(difference, 1440 - difference);
 }
+function isValidIsoDate(value: string) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return false;
+  const [year, month, day] = match.slice(1).map(Number);
+  const date = new Date(year, month - 1, day);
+  return (
+    date.getFullYear() === year &&
+    date.getMonth() === month - 1 &&
+    date.getDate() === day
+  );
+}
 function supplyEstimate(supply?: Supply) {
   if (
     !supply ||
@@ -795,6 +806,8 @@ export default function App() {
   const insightsY = useRef(0);
   const [trackingStart, setTrackingStart] = useState(dateKey(new Date()));
   const [reportOpen, setReportOpen] = useState(false);
+  const [routineReviewOpen, setRoutineReviewOpen] = useState(false);
+  const [routineConfirmed, setRoutineConfirmed] = useState(false);
   const [careToolsOpen, setCareToolsOpen] = useState(false);
   const [historyDoseId, setHistoryDoseId] = useState<string | null>(null);
   const [reportDays, setReportDays] = useState<7 | 30>(7);
@@ -1086,14 +1099,21 @@ export default function App() {
     }
     if (
       bottleMl &&
-      (Number(bottleMl) <= 0 ||
+      (!Number.isFinite(Number(bottleMl)) ||
+        Number(bottleMl) <= 0 ||
+        !Number.isFinite(Number(dropsPerApplication)) ||
         Number(dropsPerApplication) <= 0 ||
+        !Number.isFinite(Number(applicationsPerDay)) ||
         Number(applicationsPerDay) <= 0 ||
-        Number.isNaN(new Date(`${openedOn}T00:00:00`).getTime()))
+        !Number.isInteger(Number(applicationsPerDay)) ||
+        !Number.isFinite(Number(warningDays)) ||
+        Number(warningDays) < 0 ||
+        !Number.isInteger(Number(warningDays)) ||
+        !isValidIsoDate(openedOn))
     ) {
       Alert.alert(
         "Check the supply estimate",
-        "Enter a positive bottle size, uses per day, drops per use, and a date like 2026-09-05—or leave bottle size blank to skip the estimate.",
+        "Enter a positive numeric bottle size and drops per use, whole-number uses and warning days, and a real date like 2026-09-05—or leave bottle size blank to skip the estimate.",
       );
       return;
     }
@@ -1113,12 +1133,16 @@ export default function App() {
         `${closeDose.name} is scheduled at ${closeDose.time}. Confirm the spacing in the clinician’s instructions before saving.`,
         [
           { text: "Go back", style: "cancel" },
-          { text: "Save anyway", onPress: persistDose },
+          { text: "Review routine", onPress: openRoutineReview },
         ],
       );
       return;
     }
-    persistDose();
+    openRoutineReview();
+  }
+  function openRoutineReview() {
+    setRoutineConfirmed(false);
+    setRoutineReviewOpen(true);
   }
   function persistDose() {
     const supply = bottleMl
@@ -1582,11 +1606,17 @@ export default function App() {
           onPharmacy={setPharmacy}
           onRxNumber={setRxNumber}
           onPersonalNotes={setPersonalNotes}
-          onBottleMl={setBottleMl}
-          onDropsPerApplication={setDropsPerApplication}
-          onApplicationsPerDay={setApplicationsPerDay}
-          onOpenedOn={setOpenedOn}
-          onWarningDays={setWarningDays}
+          onBottleMl={(value) => setBottleMl(value.replace(/[^0-9.]/g, ""))}
+          onDropsPerApplication={(value) =>
+            setDropsPerApplication(value.replace(/[^0-9.]/g, ""))
+          }
+          onApplicationsPerDay={(value) =>
+            setApplicationsPerDay(value.replace(/\D/g, ""))
+          }
+          onOpenedOn={(value) =>
+            setOpenedOn(value.replace(/[^0-9-]/g, "").slice(0, 10))
+          }
+          onWarningDays={(value) => setWarningDays(value.replace(/\D/g, ""))}
           onEye={setEye}
           onColor={setColor}
           onClose={() => setModalOpen(false)}
@@ -1594,6 +1624,26 @@ export default function App() {
           onDelete={deleteEditingDose}
         />
       </SafeAreaView>
+      <RoutineReviewModal
+        visible={routineReviewOpen}
+        animation={settings.reduceMotion ? "none" : "slide"}
+        name={name.trim()}
+        eye={eye}
+        times={[time, ...additionalTimes]}
+        clinicianInstructions={taperPlan}
+        bottleMl={bottleMl}
+        dropsPerApplication={dropsPerApplication}
+        applicationsPerDay={applicationsPerDay}
+        openedOn={openedOn}
+        warningDays={warningDays}
+        confirmed={routineConfirmed}
+        onConfirmed={setRoutineConfirmed}
+        onBack={() => setRoutineReviewOpen(false)}
+        onSave={() => {
+          setRoutineReviewOpen(false);
+          persistDose();
+        }}
+      />
       <CareToolsModal
         visible={careToolsOpen}
         animation={settings.reduceMotion ? "none" : "slide"}
@@ -3498,6 +3548,17 @@ type ModalProps = {
   onSave: () => void;
   onDelete: () => void;
 };
+function RoutineReviewModal({ visible, animation, name, eye, times, clinicianInstructions, bottleMl, dropsPerApplication, applicationsPerDay, openedOn, warningDays, confirmed, onConfirmed, onBack, onSave }: { visible: boolean; animation: "none" | "slide"; name: string; eye: Eye; times: string[]; clinicianInstructions: string; bottleMl: string; dropsPerApplication: string; applicationsPerDay: string; openedOn: string; warningDays: string; confirmed: boolean; onConfirmed: (value: boolean) => void; onBack: () => void; onSave: () => void }) {
+  const warnings: string[] = [];
+  if (bottleMl && Number(applicationsPerDay) !== times.length) warnings.push(`This routine has ${times.length} reminder${times.length === 1 ? "" : "s"}, while the supply estimate says ${applicationsPerDay} use${Number(applicationsPerDay) === 1 ? "" : "s"} per day. Confirm both against the prescription label.`);
+  if (bottleMl && isValidIsoDate(openedOn)) {
+    const opened = new Date(`${openedOn}T00:00:00`);
+    const ageInDays = Math.floor((Date.now() - opened.getTime()) / 86400000);
+    if (opened.getTime() > Date.now()) warnings.push("The bottle-opened date is in the future. This can be valid for a planned routine, but confirm it before saving.");
+    else if (ageInDays > 365) warnings.push("The bottle-opened date is more than a year ago. Confirm that it is still the correct bottle and date.");
+  }
+  return <Modal visible={visible} animationType={animation} presentationStyle="pageSheet" onRequestClose={onBack}><SafeAreaView style={styles.modalScreen}><View style={styles.modalHeader}><View><Text style={styles.sectionLabel}>REVIEW ROUTINE</Text><Text style={styles.modalTitle}>Check before saving</Text></View><Pressable accessibilityRole="button" accessibilityLabel="Return to routine editing" onPress={onBack} style={styles.close}><Text style={styles.closeText}>×</Text></Pressable></View><ScrollView contentContainerStyle={styles.form}><View style={styles.note}><Text style={styles.noteTitle}>ClearCue supports your plan</Text><Text style={styles.noteText}>ClearCue does not diagnose, prescribe, validate a clinical treatment plan, or replace your clinician’s instructions or prescription label.</Text></View><View style={extraStyles.detailsSection}><Text style={styles.fieldLabel}>{name}</Text><Text style={extraStyles.supplyHelp}>{eye} · {times.join(" · ")}</Text>{clinicianInstructions ? <Text style={extraStyles.supplyHelp}>Clinician instructions: {clinicianInstructions}</Text> : null}{bottleMl ? <Text style={extraStyles.supplyHelp}>Supply estimate: {bottleMl} mL · {dropsPerApplication} drop{Number(dropsPerApplication) === 1 ? "" : "s"} each use · {applicationsPerDay} use{Number(applicationsPerDay) === 1 ? "" : "s"} daily · opened {openedOn} · warning {warningDays} days before estimate</Text> : <Text style={extraStyles.supplyHelp}>No supply estimate added.</Text>}</View>{warnings.map((warning) => <View key={warning} style={extraStyles.eraseSection}><Text style={extraStyles.eraseTitle}>Review this detail</Text><Text style={extraStyles.eraseText}>{warning}</Text></View>)}<Pressable accessibilityRole="checkbox" accessibilityState={{ checked: confirmed }} accessibilityLabel="I checked these values against my clinician's prescription" onPress={() => onConfirmed(!confirmed)} style={[styles.choice, confirmed && styles.choiceSelected]}><Text style={[styles.choiceText, confirmed && styles.choiceTextSelected]}>{confirmed ? "✓ " : ""}I checked these values against my clinician’s prescription.</Text></Pressable><Pressable accessibilityRole="button" accessibilityState={{ disabled: !confirmed }} accessibilityLabel="Save reviewed eye drop routine" disabled={!confirmed} onPress={onSave} style={[styles.saveButton, !confirmed && { opacity: 0.45 }]}><Text style={styles.saveText}>Save routine</Text></Pressable><Pressable accessibilityRole="button" accessibilityLabel="Return to routine editing" onPress={onBack} style={extraStyles.emptyGuide}><Text style={extraStyles.cardLink}>Go back and edit</Text></Pressable></ScrollView></SafeAreaView></Modal>;
+}
 function AddMedicationModal(props: ModalProps) {
   const [medicationFilter, setMedicationFilter] =
     useState<MedicationFilter>("All");

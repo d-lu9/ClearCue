@@ -874,6 +874,18 @@ function localizedEye(eye: Eye, language: "en" | "es") {
       ? "Ojo derecho"
       : "Ambos ojos";
 }
+function localizedMedicationFilter(filter: MedicationFilter, language: "en" | "es") {
+  if (language === "en") return filter;
+  return ({
+    All: "Todos",
+    "Eye pressure": "Presión ocular",
+    "Dry eye & lubricants": "Ojo seco y lubricantes",
+    Allergy: "Alergia",
+    Infection: "Infección",
+    "Inflammation & post-op": "Inflamación y posoperatorio",
+    "Redness relief": "Alivio del enrojecimiento",
+  } as Record<string, string>)[filter] ?? filter;
+}
 
 async function scheduleReminders(
   doses: Dose[],
@@ -1257,16 +1269,16 @@ export default function App() {
     setRoutineFormNotice(null);
     if (!name.trim()) {
       setRoutineFormNotice({
-        title: "Add a medication name",
-        message: "For example, Artificial Tears or Prednisolone Acetate.",
+        title: settings.language === "es" ? "Añade un nombre de medicamento" : "Add a medication name",
+        message: settings.language === "es" ? "Por ejemplo, Lágrimas artificiales o acetato de prednisolona." : "For example, Artificial Tears or Prednisolone Acetate.",
       });
       return;
     }
     const allTimes = [time, ...additionalTimes];
     if (allTimes.some((item) => !parseReminderTime(item))) {
       setRoutineFormNotice({
-        title: "Use a time like 8:00 AM",
-        message: "ClearCue needs a valid time for every daily reminder.",
+        title: settings.language === "es" ? "Usa una hora como 8:00 AM" : "Use a time like 8:00 AM",
+        message: settings.language === "es" ? "ClearCue necesita una hora válida para cada recordatorio diario." : "ClearCue needs a valid time for every daily reminder.",
       });
       return;
     }
@@ -1275,8 +1287,8 @@ export default function App() {
       allTimes.length
     ) {
       setRoutineFormNotice({
-        title: "Choose different times",
-        message: "Each daily reminder for this medication needs its own time.",
+        title: settings.language === "es" ? "Elige horas diferentes" : "Choose different times",
+        message: settings.language === "es" ? "Cada recordatorio diario de este medicamento necesita una hora distinta." : "Each daily reminder for this medication needs its own time.",
       });
       return;
     }
@@ -1295,8 +1307,8 @@ export default function App() {
         !isValidIsoDate(openedOn))
     ) {
       setRoutineFormNotice({
-        title: "Check the supply estimate",
-        message: "Enter a positive numeric bottle size and drops per use, whole-number uses and warning days, and a real date like 2026-09-05—or leave bottle size blank to skip the estimate.",
+        title: settings.language === "es" ? "Revisa la estimación de suministro" : "Check the supply estimate",
+        message: settings.language === "es" ? "Ingresa un tamaño de frasco y gotas por uso positivos, usos y días de aviso en números enteros, y una fecha real como 2026-09-05; o deja vacío el tamaño del frasco para omitir la estimación." : "Enter a positive numeric bottle size and drops per use, whole-number uses and warning days, and a real date like 2026-09-05—or leave bottle size blank to skip the estimate.",
       });
       return;
     }
@@ -1312,8 +1324,8 @@ export default function App() {
     );
     if (closeDose) {
       setRoutineFormNotice({
-        title: "These drops are very close together",
-        message: `${closeDose.name} is scheduled at ${closeDose.time}. Confirm the spacing in the clinician’s instructions before saving.`,
+        title: settings.language === "es" ? "Estas gotas están muy juntas" : "These drops are very close together",
+        message: settings.language === "es" ? `${closeDose.name} está programado a las ${closeDose.time}. Confirma el intervalo en las instrucciones del profesional antes de guardar.` : `${closeDose.name} is scheduled at ${closeDose.time}. Confirm the spacing in the clinician’s instructions before saving.`,
         allowReview: true,
       });
       return;
@@ -3984,7 +3996,7 @@ function AddMedicationModal(props: ModalProps) {
           </View>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Close add medication form"
+            accessibilityLabel={spanish ? "Cerrar formulario de medicamento" : "Close add medication form"}
             style={styles.close}
             onPress={props.onClose}
           >
@@ -4015,7 +4027,7 @@ function AddMedicationModal(props: ModalProps) {
                 <Pressable
                   accessibilityRole="radio"
                   accessibilityState={{ selected: medicationFilter === filter }}
-                  accessibilityLabel={`Filter medications: ${filter}`}
+                  accessibilityLabel={spanish ? `Filtrar medicamentos: ${localizedMedicationFilter(filter, props.language)}` : `Filter medications: ${filter}`}
                   key={filter}
                   onPress={() => {
                     setShowAllSuggestions(false);
@@ -4034,7 +4046,7 @@ function AddMedicationModal(props: ModalProps) {
                         extraStyles.filterChipTextSelected,
                     ]}
                   >
-                    {filter}
+                    {localizedMedicationFilter(filter, props.language)}
                   </Text>
                 </Pressable>
               ))}
@@ -4044,7 +4056,7 @@ function AddMedicationModal(props: ModalProps) {
             {displayedSuggestions.map((medication) => (
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel={`Choose ${medication.genericName}`}
+                accessibilityLabel={spanish ? `Elegir ${medication.genericName}` : `Choose ${medication.genericName}`}
                 key={medication.id}
                 onPress={() => props.onSelectMedication(medication)}
                 style={{
@@ -4076,7 +4088,7 @@ function AddMedicationModal(props: ModalProps) {
             {suggestions.length > displayedSuggestions.length ? (
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel={`Show all ${suggestions.length} medication results`}
+                accessibilityLabel={spanish ? `Mostrar los ${suggestions.length} resultados de medicamentos` : `Show all ${suggestions.length} medication results`}
                 onPress={() => setShowAllSuggestions(true)}
                 style={extraStyles.emptyGuide}
               >
@@ -4143,7 +4155,7 @@ function AddMedicationModal(props: ModalProps) {
               </Text>
               <Pressable
                 accessibilityRole="link"
-                accessibilityLabel={`Open DailyMed sources for ${props.selectedMedication.genericName}`}
+                accessibilityLabel={spanish ? `Abrir fuentes de DailyMed para ${props.selectedMedication.genericName}` : `Open DailyMed sources for ${props.selectedMedication.genericName}`}
                 onPress={() => {
                   void Linking.openURL(
                     medicationDailyMedUrl(props.selectedMedication!),
@@ -4161,6 +4173,7 @@ function AddMedicationModal(props: ModalProps) {
             label={spanish ? "Primer recordatorio diario" : "First daily reminder"}
             value={props.time}
             onChange={props.onTime}
+            language={props.language}
           />
           <View style={extraStyles.extraTimes}>
             <Text style={styles.fieldLabel}>{spanish ? "Recordatorios diarios adicionales" : "Additional daily reminders"}</Text>
@@ -4180,11 +4193,12 @@ function AddMedicationModal(props: ModalProps) {
                         ),
                       )
                     }
+                    language={props.language}
                   />
                 </View>
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel={`Remove reminder ${index + 2}`}
+                  accessibilityLabel={spanish ? `Eliminar recordatorio ${index + 2}` : `Remove reminder ${index + 2}`}
                   onPress={() =>
                     props.onAdditionalTimes(
                       props.additionalTimes.filter(
@@ -4200,7 +4214,7 @@ function AddMedicationModal(props: ModalProps) {
             ))}
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Add another daily reminder time"
+              accessibilityLabel={spanish ? "Añadir otra hora de recordatorio diario" : "Add another daily reminder time"}
               onPress={() =>
                 props.onAdditionalTimes([...props.additionalTimes, "1:00 PM"])
               }
@@ -4213,7 +4227,7 @@ function AddMedicationModal(props: ModalProps) {
           </View>
           <Field label={spanish ? "Instrucciones de aplicación del profesional (opcional)" : "Clinician application instructions (optional)"}>
             <TextInput
-              accessibilityLabel="Clinician application instructions"
+              accessibilityLabel={spanish ? "Instrucciones de aplicación del profesional" : "Clinician application instructions"}
               value={props.clinicianInstructions}
               onChangeText={props.onClinicianInstructions}
               placeholder={spanish ? "Copia las instrucciones de tu profesional o de la etiqueta" : "Copy the instructions from your clinician or prescription label"}
@@ -4227,15 +4241,14 @@ function AddMedicationModal(props: ModalProps) {
           </Field>
           <View style={extraStyles.detailsSection}>
             <Text style={styles.fieldLabel}>
-              Private prescription details (optional)
+              {spanish ? "Detalles privados de la receta (opcional)" : "Private prescription details (optional)"}
             </Text>
             <Text style={extraStyles.supplyHelp}>
-              Stored only on this device. These details are never used to change
-              a medication schedule.
+              {spanish ? "Se guardan solo en este dispositivo. Estos datos nunca cambian el horario del medicamento." : "Stored only on this device. These details are never used to change a medication schedule."}
             </Text>
-            <Field label="Prescriber">
+            <Field label={spanish ? "Profesional que receta" : "Prescriber"}>
               <TextInput
-                accessibilityLabel="Prescriber name"
+                accessibilityLabel={spanish ? "Nombre del profesional que receta" : "Prescriber name"}
                 value={props.prescriber}
                 onChangeText={props.onPrescriber}
                 placeholder="e.g. Dr. Rivera"
@@ -4243,9 +4256,9 @@ function AddMedicationModal(props: ModalProps) {
                 style={styles.input}
               />
             </Field>
-            <Field label="Prescriber phone">
+            <Field label={spanish ? "Teléfono del profesional" : "Prescriber phone"}>
               <TextInput
-                accessibilityLabel="Prescriber phone number"
+                accessibilityLabel={spanish ? "Teléfono del profesional" : "Prescriber phone number"}
                 value={props.prescriberPhone}
                 onChangeText={props.onPrescriberPhone}
                 placeholder="e.g. (555) 123-4567"
@@ -4256,9 +4269,9 @@ function AddMedicationModal(props: ModalProps) {
                 style={styles.input}
               />
             </Field>
-            <Field label="Pharmacy">
+            <Field label={spanish ? "Farmacia" : "Pharmacy"}>
               <TextInput
-                accessibilityLabel="Pharmacy name"
+                accessibilityLabel={spanish ? "Nombre de la farmacia" : "Pharmacy name"}
                 value={props.pharmacy}
                 onChangeText={props.onPharmacy}
                 placeholder="e.g. Main Street Pharmacy"
@@ -4266,9 +4279,9 @@ function AddMedicationModal(props: ModalProps) {
                 style={styles.input}
               />
             </Field>
-            <Field label="Pharmacy phone">
+            <Field label={spanish ? "Teléfono de la farmacia" : "Pharmacy phone"}>
               <TextInput
-                accessibilityLabel="Pharmacy phone number"
+                accessibilityLabel={spanish ? "Teléfono de la farmacia" : "Pharmacy phone number"}
                 value={props.pharmacyPhone}
                 onChangeText={props.onPharmacyPhone}
                 placeholder="e.g. (555) 123-4567"
@@ -4279,22 +4292,22 @@ function AddMedicationModal(props: ModalProps) {
                 style={styles.input}
               />
             </Field>
-            <Field label="Prescription number">
+            <Field label={spanish ? "Número de receta" : "Prescription number"}>
               <TextInput
-                accessibilityLabel="Prescription number"
+                accessibilityLabel={spanish ? "Número de receta" : "Prescription number"}
                 value={props.rxNumber}
                 onChangeText={props.onRxNumber}
-                placeholder="Optional"
+                placeholder={spanish ? "Opcional" : "Optional"}
                 placeholderTextColor="#81969A"
                 style={styles.input}
               />
             </Field>
-            <Field label="Personal note">
+            <Field label={spanish ? "Nota personal" : "Personal note"}>
               <TextInput
-                accessibilityLabel="Personal medication note"
+                accessibilityLabel={spanish ? "Nota personal del medicamento" : "Personal medication note"}
                 value={props.personalNotes}
                 onChangeText={props.onPersonalNotes}
-                placeholder="Optional reminder for yourself"
+                placeholder={spanish ? "Recordatorio opcional para ti" : "Optional reminder for yourself"}
                 placeholderTextColor="#81969A"
                 multiline
                 style={[
@@ -4305,21 +4318,19 @@ function AddMedicationModal(props: ModalProps) {
             </Field>
           </View>
           <View style={styles.note}>
-            <Text style={styles.noteTitle}>ClearCue supports your plan</Text>
+            <Text style={styles.noteTitle}>{spanish ? "ClearCue apoya tu plan" : "ClearCue supports your plan"}</Text>
             <Text style={styles.noteText}>
-              ClearCue does not diagnose, prescribe, change a dose, or replace
-              your clinician’s instructions or prescription label.
+              {spanish ? "ClearCue no diagnostica, receta, cambia una dosis ni reemplaza las instrucciones de tu profesional o la etiqueta de la receta." : "ClearCue does not diagnose, prescribe, change a dose, or replace your clinician’s instructions or prescription label."}
             </Text>
           </View>
           <View style={extraStyles.supplySection}>
-            <Text style={styles.fieldLabel}>Optional supply estimate</Text>
+            <Text style={styles.fieldLabel}>{spanish ? "Estimación de suministro opcional" : "Optional supply estimate"}</Text>
             <Text style={extraStyles.supplyHelp}>
-              Use this only as a planning estimate. Confirm refills and bottle
-              instructions with your pharmacy or clinician.
+              {spanish ? "Úsala solo para planificación. Confirma las reposiciones y las instrucciones del frasco con tu farmacia o profesional." : "Use this only as a planning estimate. Confirm refills and bottle instructions with your pharmacy or clinician."}
             </Text>
-            <Field label="Bottle size (mL)">
+            <Field label={spanish ? "Tamaño del frasco (mL)" : "Bottle size (mL)"}>
               <TextInput
-                accessibilityLabel="Bottle size in milliliters"
+                accessibilityLabel={spanish ? "Tamaño del frasco en mililitros" : "Bottle size in milliliters"}
                 value={props.bottleMl}
                 onChangeText={props.onBottleMl}
                 placeholder="e.g. 5"
@@ -4330,9 +4341,9 @@ function AddMedicationModal(props: ModalProps) {
             </Field>
             <View style={extraStyles.supplyRow}>
               <View style={extraStyles.supplyHalf}>
-                <Field label="Drops each use">
+                <Field label={spanish ? "Gotas en cada uso" : "Drops each use"}>
                   <TextInput
-                    accessibilityLabel="Drops per application"
+                    accessibilityLabel={spanish ? "Gotas por aplicación" : "Drops per application"}
                     value={props.dropsPerApplication}
                     onChangeText={props.onDropsPerApplication}
                     keyboardType="number-pad"
@@ -4342,9 +4353,9 @@ function AddMedicationModal(props: ModalProps) {
                 </Field>
               </View>
               <View style={extraStyles.supplyHalf}>
-                <Field label="Uses per day">
+                <Field label={spanish ? "Usos por día" : "Uses per day"}>
                   <TextInput
-                    accessibilityLabel="Applications per day"
+                    accessibilityLabel={spanish ? "Aplicaciones por día" : "Applications per day"}
                     value={props.applicationsPerDay}
                     onChangeText={props.onApplicationsPerDay}
                     keyboardType="number-pad"
@@ -4355,13 +4366,14 @@ function AddMedicationModal(props: ModalProps) {
               </View>
             </View>
             <DatePicker
-              label="Bottle opened"
+              label={spanish ? "Frasco abierto" : "Bottle opened"}
               value={props.openedOn}
               onChange={props.onOpenedOn}
+              language={props.language}
             />
-            <Field label="Warn me this many days before estimate">
+            <Field label={spanish ? "Avisarme esta cantidad de días antes de la estimación" : "Warn me this many days before estimate"}>
               <TextInput
-                accessibilityLabel="Refill warning days"
+                accessibilityLabel={spanish ? "Días de aviso para reposición" : "Refill warning days"}
                 value={props.warningDays}
                 onChangeText={props.onWarningDays}
                 keyboardType="number-pad"
@@ -4370,17 +4382,16 @@ function AddMedicationModal(props: ModalProps) {
               />
             </Field>
             <Text style={extraStyles.supplyFootnote}>
-              ClearCue estimates using 20 drops per mL. Actual bottle volume and
-              drop size can vary.
+              {spanish ? "ClearCue estima usando 20 gotas por mL. El volumen real del frasco y el tamaño de la gota pueden variar." : "ClearCue estimates using 20 drops per mL. Actual bottle volume and drop size can vary."}
             </Text>
           </View>
-          <Field label="Which eye?">
+          <Field label={spanish ? "¿Qué ojo?" : "Which eye?"}>
             <View style={styles.choiceRow}>
               {(["Left eye", "Right eye", "Both eyes"] as Eye[]).map((item) => (
                 <Pressable
                   accessibilityRole="radio"
                   accessibilityState={{ selected: props.eye === item }}
-                  accessibilityLabel={item}
+                  accessibilityLabel={localizedEye(item, props.language)}
                   key={item}
                   onPress={() => props.onEye(item)}
                   style={[
@@ -4394,19 +4405,19 @@ function AddMedicationModal(props: ModalProps) {
                       props.eye === item && styles.choiceTextSelected,
                     ]}
                   >
-                    {item.replace(" eye", "")}
+                    {localizedEye(item, props.language).replace(spanish ? "Ojo " : " eye", "")}
                   </Text>
                 </Pressable>
               ))}
             </View>
           </Field>
-          <Field label="Bottle label color">
+          <Field label={spanish ? "Color de la etiqueta del frasco" : "Bottle label color"}>
             <View style={styles.colorRow}>
               {COLORS.map((item) => (
                 <Pressable
                   accessibilityRole="radio"
                   accessibilityState={{ selected: props.color === item }}
-                  accessibilityLabel={`${COLOR_NAMES[item]?.en ?? "Custom"} bottle label`}
+                  accessibilityLabel={`${COLOR_NAMES[item]?.[props.language] ?? (spanish ? "Personalizado" : "Custom")} ${spanish ? "etiqueta del frasco" : "bottle label"}`}
                   key={item}
                   onPress={() => props.onColor(item)}
                   style={[
@@ -4419,10 +4430,9 @@ function AddMedicationModal(props: ModalProps) {
             </View>
           </Field>
           <View style={styles.note}>
-            <Text style={styles.noteTitle}>Confirm your bottle</Text>
+            <Text style={styles.noteTitle}>{spanish ? "Confirma tu frasco" : "Confirm your bottle"}</Text>
             <Text style={styles.noteText}>
-              Brand and generic packaging can differ. Choose the label color you
-              see on your bottle and follow your clinician’s instructions.
+              {spanish ? "El empaque de marca y genérico puede variar. Elige el color de la etiqueta que ves en tu frasco y sigue las instrucciones de tu profesional." : "Brand and generic packaging can differ. Choose the label color you see on your bottle and follow your clinician’s instructions."}
             </Text>
           </View>
           {props.formNotice && (
@@ -4432,20 +4442,20 @@ function AddMedicationModal(props: ModalProps) {
               <View style={styles.choiceRow}>
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel="Dismiss routine form message"
+                  accessibilityLabel={spanish ? "Descartar mensaje del formulario" : "Dismiss routine form message"}
                   onPress={props.onDismissNotice}
                   style={styles.choice}
                 >
-                  <Text style={styles.choiceText}>Keep editing</Text>
+                  <Text style={styles.choiceText}>{spanish ? "Seguir editando" : "Keep editing"}</Text>
                 </Pressable>
                 {props.formNotice.allowReview && (
                   <Pressable
                     accessibilityRole="button"
-                    accessibilityLabel="Review routine despite close reminder times"
+                    accessibilityLabel={spanish ? "Revisar rutina a pesar de horarios cercanos" : "Review routine despite close reminder times"}
                     onPress={props.onReviewNotice}
                     style={extraStyles.deleteConfirmButton}
                   >
-                    <Text style={extraStyles.deleteConfirmButtonText}>Review routine</Text>
+                    <Text style={extraStyles.deleteConfirmButtonText}>{spanish ? "Revisar rutina" : "Review routine"}</Text>
                   </Pressable>
                 )}
               </View>
@@ -4453,50 +4463,49 @@ function AddMedicationModal(props: ModalProps) {
           )}
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Save medication"
+            accessibilityLabel={spanish ? "Guardar medicamento" : "Save medication"}
             onPress={props.onSave}
             style={styles.saveButton}
           >
             <Text style={styles.saveText}>
-              {props.isEditing ? "Save changes" : "Add to my routine"}
+              {props.isEditing ? (spanish ? "Guardar cambios" : "Save changes") : (spanish ? "Añadir a mi rutina" : "Add to my routine")}
             </Text>
           </Pressable>
           {props.isEditing &&
             (props.deleteConfirming ? (
               <View style={extraStyles.deleteConfirm}>
-                <Text style={extraStyles.eraseTitle}>Remove this eye drop?</Text>
+                <Text style={extraStyles.eraseTitle}>{spanish ? "¿Eliminar estas gotas?" : "Remove this eye drop?"}</Text>
                 <Text style={extraStyles.eraseText}>
-                  This removes all of this medication’s daily reminder times
-                  from the routine.
+                  {spanish ? "Esto elimina de la rutina todos los horarios diarios de este medicamento." : "This removes all of this medication’s daily reminder times from the routine."}
                 </Text>
                 <View style={styles.choiceRow}>
                   <Pressable
                     accessibilityRole="button"
-                    accessibilityLabel="Keep this medication"
+                    accessibilityLabel={spanish ? "Conservar este medicamento" : "Keep this medication"}
                     onPress={props.onCancelDelete}
                     style={styles.choice}
                   >
-                    <Text style={styles.choiceText}>Keep</Text>
+                    <Text style={styles.choiceText}>{spanish ? "Conservar" : "Keep"}</Text>
                   </Pressable>
                   <Pressable
                     accessibilityRole="button"
-                    accessibilityLabel="Confirm removal of this medication"
+                    accessibilityLabel={spanish ? "Confirmar eliminación de este medicamento" : "Confirm removal of this medication"}
                     onPress={props.onConfirmDelete}
                     style={extraStyles.deleteConfirmButton}
                   >
-                    <Text style={extraStyles.deleteConfirmButtonText}>Remove</Text>
+                    <Text style={extraStyles.deleteConfirmButtonText}>{spanish ? "Eliminar" : "Remove"}</Text>
                   </Pressable>
                 </View>
               </View>
             ) : (
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="Remove this medication"
+                accessibilityLabel={spanish ? "Eliminar este medicamento" : "Remove this medication"}
                 onPress={props.onDelete}
                 style={{ padding: 14, alignItems: "center" }}
               >
                 <Text style={{ color: "#B3362D", fontWeight: "800" }}>
-                  Remove this eye drop
+                  {spanish ? "Eliminar estas gotas" : "Remove this eye drop"}
                 </Text>
               </Pressable>
             ))}
@@ -4509,30 +4518,33 @@ function TimePicker({
   label,
   value,
   onChange,
+  language,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
+  language: "en" | "es";
 }) {
+  const spanish = language === "es";
   const [open, setOpen] = useState(false);
   return (
     <Field label={label}>
       <Pressable
         accessibilityRole="button"
         accessibilityState={{ expanded: open }}
-        accessibilityLabel={`${label}: ${value}. Open time menu`}
-        accessibilityHint="Choose a common reminder time or enter a custom time"
+        accessibilityLabel={`${label}: ${value}. ${spanish ? "Abrir menú de hora" : "Open time menu"}`}
+        accessibilityHint={spanish ? "Elige una hora común o ingresa una hora personalizada" : "Choose a common reminder time or enter a custom time"}
         onPress={() => setOpen((current) => !current)}
         style={extraStyles.timePickerButton}
       >
         <Text style={extraStyles.timePickerValue}>
-          {value || "Select a time"}
+          {value || (spanish ? "Selecciona una hora" : "Select a time")}
         </Text>
         <Text style={extraStyles.timePickerArrow}>{open ? "⌃" : "⌄"}</Text>
       </Pressable>
       {open && (
         <View style={extraStyles.timeMenu}>
-          <Text style={extraStyles.supplyHelp}>Choose a common time</Text>
+          <Text style={extraStyles.supplyHelp}>{spanish ? "Elige una hora común" : "Choose a common time"}</Text>
           <View style={extraStyles.timeMenuGrid}>
             {TIME_OPTIONS.map((option) => (
               <Pressable
@@ -4561,20 +4573,19 @@ function TimePicker({
             ))}
           </View>
           <Text style={[styles.fieldLabel, { marginTop: 5 }]}>
-            Or set a custom time
+            {spanish ? "O establece una hora personalizada" : "Or set a custom time"}
           </Text>
-          <ClockDial value={value} onChange={onChange} />
+          <ClockDial value={value} onChange={onChange} language={language} />
           <TextInput
             accessibilityLabel={`Custom ${label.toLowerCase()}`}
             value={value}
             onChangeText={onChange}
-            placeholder="Or type e.g. 8:30 AM"
+            placeholder={spanish ? "O escribe, por ejemplo, 8:30 AM" : "Or type e.g. 8:30 AM"}
             placeholderTextColor="#81969A"
             style={styles.input}
           />
           <Text style={extraStyles.supplyHelp}>
-            Choose an hour, minutes, and AM/PM—or type a precise time. Your
-            iPhone reminder will use this exact time.
+            {spanish ? "Elige una hora, minutos y AM/PM, o escribe una hora precisa. El recordatorio de tu iPhone usará esta hora exacta." : "Choose an hour, minutes, and AM/PM—or type a precise time. Your iPhone reminder will use this exact time."}
           </Text>
         </View>
       )}
@@ -4584,9 +4595,11 @@ function TimePicker({
 function ClockDial({
   value,
   onChange,
+  language,
 }: {
   value: string;
   onChange: (value: string) => void;
+  language: "en" | "es";
 }) {
   const clock = parseReminderTime(value) ?? { hour: 9, minute: 0 };
   const displayHour = clock.hour % 12 || 12;
@@ -4595,7 +4608,7 @@ function ClockDial({
     onChange(formatReminderTime(hour, minute));
   return (
     <View style={extraStyles.clockPicker}>
-      <Text style={extraStyles.supplyHelp}>Tap the clock to choose an hour</Text>
+      <Text style={extraStyles.supplyHelp}>{language === "es" ? "Toca el reloj para elegir una hora" : "Tap the clock to choose an hour"}</Text>
       <View style={extraStyles.clockDial}>
         {Array.from({ length: 12 }, (_, index) => index + 1).map((hour) => {
           const angle = ((hour % 12) * Math.PI) / 6 - Math.PI / 2;
@@ -4704,11 +4717,14 @@ function DatePicker({
   label,
   value,
   onChange,
+  language,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
+  language: "en" | "es";
 }) {
+  const spanish = language === "es";
   const [open, setOpen] = useState(false);
   const selectedDate = isValidIsoDate(value)
     ? new Date(`${value}T00:00:00`)
@@ -4716,7 +4732,7 @@ function DatePicker({
   const [visibleMonth, setVisibleMonth] = useState(() =>
     new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1),
   );
-  const monthLabel = visibleMonth.toLocaleDateString("en-US", {
+  const monthLabel = visibleMonth.toLocaleDateString(spanish ? "es-US" : "en-US", {
     month: "long",
     year: "numeric",
   });
@@ -4742,8 +4758,8 @@ function DatePicker({
       <Pressable
         accessibilityRole="button"
         accessibilityState={{ expanded: open }}
-        accessibilityLabel={`${label}: ${value}. Open calendar`}
-        accessibilityHint="Choose the bottle-opened date from a calendar"
+        accessibilityLabel={`${label}: ${value}. ${spanish ? "Abrir calendario" : "Open calendar"}`}
+        accessibilityHint={spanish ? "Elige la fecha en que abriste el frasco desde un calendario" : "Choose the bottle-opened date from a calendar"}
         onPress={openCalendar}
         style={extraStyles.timePickerButton}
       >
@@ -4755,7 +4771,7 @@ function DatePicker({
           <View style={extraStyles.dateMenuHeader}>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Previous month"
+              accessibilityLabel={spanish ? "Mes anterior" : "Previous month"}
               onPress={() =>
                 setVisibleMonth(
                   (current) =>
@@ -4769,7 +4785,7 @@ function DatePicker({
             <Text style={extraStyles.dateMonthLabel}>{monthLabel}</Text>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Next month"
+              accessibilityLabel={spanish ? "Mes siguiente" : "Next month"}
               onPress={() =>
                 setVisibleMonth(
                   (current) =>
@@ -4782,7 +4798,10 @@ function DatePicker({
             </Pressable>
           </View>
           <View style={extraStyles.dateWeekRow}>
-            {["S", "M", "T", "W", "T", "F", "S"].map((day, index) => (
+            {(spanish
+              ? ["D", "L", "M", "X", "J", "V", "S"]
+              : ["S", "M", "T", "W", "T", "F", "S"]
+            ).map((day, index) => (
               <Text key={`${day}-${index}`} style={extraStyles.dateWeekday}>
                 {day}
               </Text>

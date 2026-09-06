@@ -26,6 +26,11 @@ Local reminder actions and full notification behavior should be tested in an iOS
 
 ## Version history
 
+### v1.25.0 — Complete Spanish medication form
+
+- Localized the add/edit medication form’s fields, private details, supply estimate, calendar, reminder-time controls, validation messages, and deletion controls.
+- Kept medication names and official source names intact while translating the surrounding interface and accessibility labels.
+
 ### v1.24.0 — Calmer welcome behavior
 
 - Full welcome onboarding now appears only on a first launch, after an intentional erase-all-data action, or when chosen manually from Settings.

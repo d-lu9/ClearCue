@@ -22,8 +22,14 @@ Local reminder actions and full notification behavior should be tested in an iOS
 - Clinician-safe “How to use drops” guide, including urgent-symptoms guidance
 - Accessibility defaults: large text, high contrast, VoiceOver labels, reduced motion, color-safe labels, and core Spanish home-screen labels
 - Demo Mode, onboarding, app icon/splash screen, and device-only privacy controls
+- A focused home screen that prioritizes today’s eye-drop routine; reports, prescription references, privacy, and accessibility are grouped under More care tools
 
 ## Version history
+
+### v1.8.0 — Focused routine dashboard
+
+- Simplified the home screen around daily progress, today’s schedule, reminders, and adding an eye drop.
+- Moved insights, prescription references, privacy controls, and accessibility settings into a single Care & settings sheet.
 
 ### v1.7.0 — Glasses prescription reference
 

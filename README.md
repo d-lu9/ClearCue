@@ -26,6 +26,12 @@ Local reminder actions and full notification behavior should be tested in an iOS
 
 ## Version history
 
+### v1.13.0 — Expanded medication use-case browsing
+
+- Expanded the offline catalog to 48 reviewed ophthalmic products and product families, including common lubricant ingredients, allergy treatments, antibiotics, anti-inflammatory drops, and redness relievers.
+- Added use-case browsing for eye pressure, dry eye and lubricants, allergy, infection, inflammation and post-operative care, and redness relief.
+- Added additional commonly labeled medications verified through the same DailyMed and FDA openFDA review process, while leaving all dosing and treatment decisions to the clinician and prescription label.
+
 ### v1.12.0 — Reviewed offline medication catalog
 
 - Expanded the bundled recognition catalog with common glaucoma and ocular-hypertension drops (including combination products), dry-eye treatments, allergy drops, and clinician-directed anti-inflammatory and antibiotic drops.

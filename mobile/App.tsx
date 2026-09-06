@@ -3609,6 +3609,7 @@ function AddMedicationModal(props: ModalProps) {
               style={styles.input}
             />
           </Field>
+          <Text style={styles.fieldLabel}>Browse by use</Text>
           <View style={extraStyles.filterRow}>
             {MEDICATION_FILTERS.map((filter) => (
               <Pressable
@@ -3661,7 +3662,9 @@ function AddMedicationModal(props: ModalProps) {
                   {medication.genericName}
                 </Text>
                 <Text style={{ fontSize: 11, color: "#6F625B", marginTop: 3 }}>
-                  {medication.brandNames.join(" · ")} · {medication.category}
+                  {[medication.brandNames.join(" · "), medication.category]
+                    .filter(Boolean)
+                    .join(" · ")}
                 </Text>
               </Pressable>
             ))}

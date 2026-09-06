@@ -11,7 +11,15 @@ export type CatalogMedication = {
   aliases?: string[];
 };
 
-export const MEDICATION_FILTERS = ['All', 'Glaucoma', 'Dry eye', 'Allergy', 'Post-op'] as const;
+export const MEDICATION_FILTERS = [
+  'All',
+  'Eye pressure',
+  'Dry eye & lubricants',
+  'Allergy',
+  'Infection',
+  'Inflammation & post-op',
+  'Redness relief',
+] as const;
 export type MedicationFilter = typeof MEDICATION_FILTERS[number];
 
 // This is a recognition aid, not a treatment reference. The bundled catalog is
@@ -44,11 +52,17 @@ export const MEDICATIONS: CatalogMedication[] = [
   { id: 'lifitegrast', genericName: 'Lifitegrast', brandNames: ['Xiidra'], aliases: ['lifitegrast ophthalmic'], category: 'LFA-1 antagonist', commonUse: 'Used for clinician-directed dry-eye treatment', form: 'Ophthalmic solution', prescriptionStatus: 'Prescription', source: OFFICIAL_SOURCE, reviewedOn: REVIEWED_ON },
   { id: 'perfluorohexyloctane', genericName: 'Perfluorohexyloctane', brandNames: ['Miebo'], aliases: ['miebo'], category: 'Semifluorinated alkane', commonUse: 'Used for clinician-directed dry-eye treatment', form: 'Ophthalmic solution', prescriptionStatus: 'Prescription', source: OFFICIAL_SOURCE, reviewedOn: REVIEWED_ON },
   { id: 'artificial-tears', genericName: 'Artificial tears', brandNames: ['Refresh', 'Systane'], aliases: ['lubricant drops'], category: 'Lubricant', commonUse: 'Helps relieve dry-eye symptoms', form: 'Ophthalmic solution or gel', prescriptionStatus: 'Over-the-counter', source: OFFICIAL_SOURCE, reviewedOn: REVIEWED_ON },
+  { id: 'carboxymethylcellulose', genericName: 'Carboxymethylcellulose sodium', brandNames: [], aliases: ['cmc', 'carboxymethylcellulose ophthalmic'], category: 'Lubricant', commonUse: 'Helps relieve dry-eye symptoms', form: 'Ophthalmic solution or gel', prescriptionStatus: 'Over-the-counter', source: OFFICIAL_SOURCE, reviewedOn: REVIEWED_ON },
+  { id: 'hypromellose', genericName: 'Hypromellose', brandNames: [], aliases: ['hydroxypropyl methylcellulose', 'hpmc', 'hypromellose ophthalmic'], category: 'Lubricant', commonUse: 'Helps relieve dry-eye symptoms', form: 'Ophthalmic solution or gel', prescriptionStatus: 'Over-the-counter', source: OFFICIAL_SOURCE, reviewedOn: REVIEWED_ON },
+  { id: 'peg-propylene-glycol', genericName: 'Polyethylene glycol 400 / propylene glycol', brandNames: ['Systane'], aliases: ['peg 400 propylene glycol', 'polyethylene glycol propylene glycol'], category: 'Lubricant', commonUse: 'Helps relieve dry-eye symptoms', form: 'Ophthalmic solution', prescriptionStatus: 'Over-the-counter', source: OFFICIAL_SOURCE, reviewedOn: REVIEWED_ON },
+  { id: 'glycerin', genericName: 'Glycerin', brandNames: [], aliases: ['glycerin ophthalmic'], category: 'Lubricant', commonUse: 'Helps relieve dry-eye symptoms', form: 'Ophthalmic solution', prescriptionStatus: 'Over-the-counter', source: OFFICIAL_SOURCE, reviewedOn: REVIEWED_ON },
 
   // Allergy drops
   { id: 'olopatadine', genericName: 'Olopatadine hydrochloride', brandNames: ['Patanol', 'Pataday'], aliases: ['olopatadine ophthalmic'], category: 'Antihistamine', commonUse: 'Used for eye-allergy symptom treatment', form: 'Ophthalmic solution', prescriptionStatus: 'Prescription or over-the-counter', source: OFFICIAL_SOURCE, reviewedOn: REVIEWED_ON },
   { id: 'ketotifen', genericName: 'Ketotifen fumarate', brandNames: ['Zaditor', 'Alaway'], aliases: ['ketotifen ophthalmic'], category: 'Antihistamine', commonUse: 'Used for eye-allergy symptom treatment', form: 'Ophthalmic solution', prescriptionStatus: 'Over-the-counter', source: OFFICIAL_SOURCE, reviewedOn: REVIEWED_ON },
   { id: 'alcaftadine', genericName: 'Alcaftadine', brandNames: ['Lastacaft'], aliases: ['alcaftadine ophthalmic'], category: 'Antihistamine', commonUse: 'Used for eye-allergy symptom treatment', form: 'Ophthalmic solution', source: OFFICIAL_SOURCE, reviewedOn: REVIEWED_ON },
+  { id: 'azelastine', genericName: 'Azelastine hydrochloride', brandNames: ['Optivar'], aliases: ['azelastine ophthalmic'], category: 'Antihistamine', commonUse: 'Used for eye-allergy symptom treatment', form: 'Ophthalmic solution', prescriptionStatus: 'Prescription', source: OFFICIAL_SOURCE, reviewedOn: REVIEWED_ON },
+  { id: 'cromolyn', genericName: 'Cromolyn sodium', brandNames: ['Crolom'], aliases: ['cromolyn ophthalmic'], category: 'Mast cell stabilizer', commonUse: 'Used for eye-allergy symptom treatment', form: 'Ophthalmic solution', prescriptionStatus: 'Prescription', source: OFFICIAL_SOURCE, reviewedOn: REVIEWED_ON },
 
   // Clinician-directed anti-inflammatory and antibiotic drops, including common post-operative regimens
   { id: 'prednisolone', genericName: 'Prednisolone acetate', brandNames: ['Pred Forte'], aliases: ['prednisolone ophthalmic'], category: 'Corticosteroid anti-inflammatory', commonUse: 'Used for clinician-directed eye inflammation treatment', form: 'Ophthalmic suspension', prescriptionStatus: 'Prescription', source: OFFICIAL_SOURCE, reviewedOn: REVIEWED_ON },
@@ -60,11 +74,34 @@ export const MEDICATIONS: CatalogMedication[] = [
   { id: 'moxifloxacin', genericName: 'Moxifloxacin hydrochloride', brandNames: ['Vigamox'], aliases: ['moxifloxacin ophthalmic'], category: 'Antibiotic', commonUse: 'Used for clinician-directed bacterial eye infection treatment', form: 'Ophthalmic solution', prescriptionStatus: 'Prescription', source: OFFICIAL_SOURCE, reviewedOn: REVIEWED_ON },
   { id: 'ofloxacin', genericName: 'Ofloxacin', brandNames: ['Ocuflox'], aliases: ['ofloxacin ophthalmic'], category: 'Antibiotic', commonUse: 'Used for clinician-directed bacterial eye infection treatment', form: 'Ophthalmic solution', prescriptionStatus: 'Prescription', source: OFFICIAL_SOURCE, reviewedOn: REVIEWED_ON },
   { id: 'besifloxacin', genericName: 'Besifloxacin', brandNames: ['Besivance'], aliases: ['besifloxacin ophthalmic'], category: 'Antibiotic', commonUse: 'Used for clinician-directed bacterial eye infection treatment', form: 'Ophthalmic suspension', prescriptionStatus: 'Prescription', source: OFFICIAL_SOURCE, reviewedOn: REVIEWED_ON },
+  { id: 'erythromycin', genericName: 'Erythromycin', brandNames: [], aliases: ['erythromycin ophthalmic'], category: 'Antibiotic', commonUse: 'Used for clinician-directed bacterial eye infection treatment', form: 'Ophthalmic ointment', prescriptionStatus: 'Prescription', source: OFFICIAL_SOURCE, reviewedOn: REVIEWED_ON },
+  { id: 'tobramycin', genericName: 'Tobramycin', brandNames: ['Tobrex'], aliases: ['tobramycin ophthalmic'], category: 'Antibiotic', commonUse: 'Used for clinician-directed bacterial eye infection treatment', form: 'Ophthalmic solution or ointment', prescriptionStatus: 'Prescription', source: OFFICIAL_SOURCE, reviewedOn: REVIEWED_ON },
+  { id: 'ciprofloxacin', genericName: 'Ciprofloxacin hydrochloride', brandNames: ['Ciloxan'], aliases: ['ciprofloxacin ophthalmic'], category: 'Antibiotic', commonUse: 'Used for clinician-directed bacterial eye infection treatment', form: 'Ophthalmic solution or ointment', prescriptionStatus: 'Prescription', source: OFFICIAL_SOURCE, reviewedOn: REVIEWED_ON },
+  { id: 'gentamicin', genericName: 'Gentamicin sulfate', brandNames: [], aliases: ['gentamicin ophthalmic'], category: 'Antibiotic', commonUse: 'Used for clinician-directed bacterial eye infection treatment', form: 'Ophthalmic solution', prescriptionStatus: 'Prescription', source: OFFICIAL_SOURCE, reviewedOn: REVIEWED_ON },
+  { id: 'tobramycin-dexamethasone', genericName: 'Tobramycin / dexamethasone', brandNames: ['Tobradex'], aliases: ['tobramycin dexamethasone', 'tobradex'], category: 'Antibiotic and corticosteroid combination', commonUse: 'Used for clinician-directed eye inflammation when an antibacterial component is needed', form: 'Ophthalmic suspension or ointment', prescriptionStatus: 'Prescription', source: OFFICIAL_SOURCE, reviewedOn: REVIEWED_ON },
+  { id: 'fluorometholone', genericName: 'Fluorometholone', brandNames: ['FML'], aliases: ['fluorometholone ophthalmic'], category: 'Corticosteroid anti-inflammatory', commonUse: 'Used for clinician-directed eye inflammation treatment', form: 'Ophthalmic suspension or solution', prescriptionStatus: 'Prescription', source: OFFICIAL_SOURCE, reviewedOn: REVIEWED_ON },
+  { id: 'dexamethasone', genericName: 'Dexamethasone', brandNames: ['Maxidex'], aliases: ['dexamethasone sodium phosphate', 'dexamethasone ophthalmic'], category: 'Corticosteroid anti-inflammatory', commonUse: 'Used for clinician-directed eye inflammation treatment', form: 'Ophthalmic suspension or solution', prescriptionStatus: 'Prescription', source: OFFICIAL_SOURCE, reviewedOn: REVIEWED_ON },
+
+  // Over-the-counter redness-relief drops
+  { id: 'naphazoline', genericName: 'Naphazoline hydrochloride', brandNames: [], aliases: ['naphazoline ophthalmic', 'naphazoline pheniramine'], category: 'Decongestant', commonUse: 'Temporarily relieves eye redness from minor irritation', form: 'Ophthalmic solution', prescriptionStatus: 'Over-the-counter', source: OFFICIAL_SOURCE, reviewedOn: REVIEWED_ON },
+  { id: 'tetrahydrozoline', genericName: 'Tetrahydrozoline hydrochloride', brandNames: [], aliases: ['tetrahydrozoline ophthalmic'], category: 'Decongestant', commonUse: 'Temporarily relieves eye redness from minor irritation', form: 'Ophthalmic solution', prescriptionStatus: 'Over-the-counter', source: OFFICIAL_SOURCE, reviewedOn: REVIEWED_ON },
+
+  // Additional common pressure-lowering drops confirmed in official labeling
+  { id: 'apraclonidine', genericName: 'Apraclonidine hydrochloride', brandNames: ['Iopidine'], aliases: ['apraclonidine ophthalmic'], category: 'Alpha agonist', commonUse: 'Used for clinician-directed short-term eye-pressure treatment', form: 'Ophthalmic solution', prescriptionStatus: 'Prescription', source: OFFICIAL_SOURCE, reviewedOn: REVIEWED_ON },
+  { id: 'carteolol', genericName: 'Carteolol hydrochloride', brandNames: ['Ocupress'], aliases: ['carteolol ophthalmic'], category: 'Beta blocker', commonUse: 'Helps lower eye pressure', form: 'Ophthalmic solution', prescriptionStatus: 'Prescription', source: OFFICIAL_SOURCE, reviewedOn: REVIEWED_ON },
 ];
 
 export function searchMedications(query: string, filter: MedicationFilter = 'All') {
   const normalized = query.trim().toLowerCase();
-  const filterTerms: Record<MedicationFilter, string[]> = { All: [], Glaucoma: ['pressure', 'prostaglandin', 'beta blocker', 'carbonic', 'alpha agonist', 'rho kinase', 'miotic', 'combination pressure'], 'Dry eye': ['dry-eye', 'lubricant', 'immunomodulator', 'lfa-1', 'semifluorinated'], Allergy: ['allergy', 'antihistamine'], 'Post-op': ['anti-inflammatory', 'antibiotic', 'nonsteroidal'] };
+  const filterTerms: Record<MedicationFilter, string[]> = {
+    All: [],
+    'Eye pressure': ['pressure', 'prostaglandin', 'beta blocker', 'carbonic', 'alpha agonist', 'rho kinase', 'miotic', 'combination pressure'],
+    'Dry eye & lubricants': ['dry-eye', 'lubricant', 'immunomodulator', 'lfa-1', 'semifluorinated'],
+    Allergy: ['allergy', 'antihistamine', 'mast cell'],
+    Infection: ['antibiotic'],
+    'Inflammation & post-op': ['anti-inflammatory', 'nonsteroidal', 'corticosteroid'],
+    'Redness relief': ['redness reliever', 'decongestant'],
+  };
   const matchesFilter = (medication: CatalogMedication) => filter === 'All' || filterTerms[filter].some((term) => `${medication.category} ${medication.commonUse}`.toLowerCase().includes(term));
   const matchesQuery = (medication: CatalogMedication) => !normalized || [medication.genericName, medication.category, medication.commonUse, ...medication.brandNames, ...(medication.aliases ?? [])].some((name) => name.toLowerCase().includes(normalized));
   return MEDICATIONS.filter((medication) => matchesFilter(medication) && matchesQuery(medication)).slice(0, 5);

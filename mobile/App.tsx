@@ -1205,12 +1205,12 @@ export default function App() {
     [complete, doses.length],
   );
   const adherence = useMemo(
-    () => buildAdherence(doses, history, trackingStart),
-    [doses, history, trackingStart],
+    () => buildAdherence(doses, history, trackingStart, 7, settings.language),
+    [doses, history, trackingStart, settings.language],
   );
   const reportData = useMemo(
-    () => buildAdherence(doses, history, trackingStart, reportDays),
-    [doses, history, trackingStart, reportDays],
+    () => buildAdherence(doses, history, trackingStart, reportDays, settings.language),
+    [doses, history, trackingStart, reportDays, settings.language],
   );
   const historyDose = doses.find((dose) => dose.id === historyDoseId) ?? null;
   const routineGroups = useMemo(() => groupRoutineDoses(doses), [doses]);
@@ -1752,6 +1752,7 @@ export default function App() {
               <EmptyRoutine
                 onAdd={startAddingDose}
                 onGuide={() => setGuideOpen(true)}
+                language={settings.language}
               />
             )}
           </View>
@@ -1768,6 +1769,7 @@ export default function App() {
               <AdherencePanel
                 data={adherence}
                 onGenerateReport={() => setReportOpen(true)}
+                language={settings.language}
               />
             </View>
           )}
@@ -2069,39 +2071,41 @@ export default function App() {
 function EmptyRoutine({
   onAdd,
   onGuide,
+  language,
 }: {
   onAdd: () => void;
   onGuide: () => void;
+  language: "en" | "es";
 }) {
+  const spanish = language === "es";
   return (
     <View
       accessible
-      accessibilityLabel="Your routine is empty. Add your first eye drop to begin."
+      accessibilityLabel={spanish ? "Tu rutina está vacía. Añade tus primeras gotas para comenzar." : "Your routine is empty. Add your first eye drop to begin."}
       style={extraStyles.emptyRoutine}
     >
       <View style={extraStyles.emptyIcon}>
         <Text style={extraStyles.emptyIconText}>◒</Text>
       </View>
-      <Text style={extraStyles.emptyTitle}>Start your routine</Text>
+      <Text style={extraStyles.emptyTitle}>{spanish ? "Comienza tu rutina" : "Start your routine"}</Text>
       <Text style={extraStyles.emptyText}>
-        Add an eye drop to create reminders, track progress, and build a
-        shareable report.
+        {spanish ? "Añade gotas para crear recordatorios, registrar el progreso y crear un informe que puedes compartir." : "Add an eye drop to create reminders, track progress, and build a shareable report."}
       </Text>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Add your first eye drop"
+        accessibilityLabel={spanish ? "Añadir tus primeras gotas" : "Add your first eye drop"}
         onPress={onAdd}
         style={styles.saveButton}
       >
-        <Text style={styles.saveText}>Add first eye drop</Text>
+        <Text style={styles.saveText}>{spanish ? "Añadir primeras gotas" : "Add first eye drop"}</Text>
       </Pressable>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Open how to use eye drops guide"
+        accessibilityLabel={spanish ? "Abrir la guía sobre cómo usar gotas" : "Open how to use eye drops guide"}
         onPress={onGuide}
         style={extraStyles.emptyGuide}
       >
-        <Text style={extraStyles.cardLink}>How to use eye drops</Text>
+        <Text style={extraStyles.cardLink}>{spanish ? "Cómo usar gotas" : "How to use eye drops"}</Text>
       </Pressable>
     </View>
   );
@@ -2385,6 +2389,7 @@ function buildAdherence(
   history: DoseLog[],
   trackingStart: string,
   dayCount = 7,
+  language: "en" | "es" = "en",
 ): AdherenceData {
   const now = new Date();
   const days: DaySummary[] = [];
@@ -2405,7 +2410,7 @@ function buildAdherence(
     });
     days.push({
       date: key,
-      label: current.toLocaleDateString("en-US", { weekday: "narrow" }),
+      label: current.toLocaleDateString(language === "es" ? "es-US" : "en-US", { weekday: "narrow" }),
       statuses,
     });
   }
@@ -2486,22 +2491,37 @@ function buildAdherence(
   const otherRate = others.length
     ? others.reduce((sum, item) => sum + item.rate, 0) / others.length
     : 0;
+  const periodName = (period?: string) =>
+    language === "es"
+      ? ({ morning: "mañana", afternoon: "tarde", evening: "noche" }[period ?? ""] ?? "registrado")
+      : period ?? "tracked";
   const insight = !expected
-    ? "Complete a few doses to unlock your first adherence insight."
+    ? language === "es"
+      ? "Registra algunas dosis para ver tu primera estadística de rutina."
+      : "Complete a few doses to unlock your first adherence insight."
     : !missed
-      ? "Excellent consistency—no missed doses in the tracked period."
+      ? language === "es"
+        ? "Excelente constancia: no hay dosis omitidas en el período registrado."
+        : "Excellent consistency—no missed doses in the tracked period."
       : highest && otherRate > 0
-        ? `You miss ${highest.period} doses ${(highest.rate / otherRate).toFixed(1)}× more often than other times.`
-        : `Most missed doses are in the ${highest?.period ?? "tracked"} period.`;
+        ? language === "es"
+          ? "Omites dosis de la " + periodName(highest.period) + ` ${(highest.rate / otherRate).toFixed(1)}× más que en otros horarios.`
+          : `You miss ${highest.period} doses ${(highest.rate / otherRate).toFixed(1)}× more often than other times.`
+        : language === "es"
+          ? `La mayoría de las dosis omitidas son por la ${periodName(highest?.period)}.`
+          : `Most missed doses are in the ${highest?.period ?? "tracked"} period.`;
   return { days, expected, taken, late, missed, streak, byMedication, insight };
 }
 function AdherencePanel({
   data,
   onGenerateReport,
+  language,
 }: {
   data: AdherenceData;
   onGenerateReport: () => void;
+  language: "en" | "es";
 }) {
+  const spanish = language === "es";
   const overall = data.expected
     ? Math.round(((data.taken + data.late) / data.expected) * 100)
     : 0;
@@ -2510,15 +2530,15 @@ function AdherencePanel({
     : 0;
   return (
     <View style={styles.insightsPanel}>
-      <Text style={styles.sectionLabel}>LAST 7 DAYS</Text>
-      <Text style={styles.insightsTitle}>Self-reported routine record</Text>
-      <Text style={styles.settingsIntro}>Based only on doses you mark in ClearCue. It does not verify administration or treatment effectiveness.</Text>
+      <Text style={styles.sectionLabel}>{spanish ? "ÚLTIMOS 7 DÍAS" : "LAST 7 DAYS"}</Text>
+      <Text style={styles.insightsTitle}>{spanish ? "Registro de rutina autoinformado" : "Self-reported routine record"}</Text>
+      <Text style={styles.settingsIntro}>{spanish ? "Se basa solo en las dosis que marcas en ClearCue. No verifica la administración ni la efectividad del tratamiento." : "Based only on doses you mark in ClearCue. It does not verify administration or treatment effectiveness."}</Text>
       <View style={styles.metricRow}>
-        <Metric value={`${overall}%`} label="Recorded" />
-        <Metric value={`${onTime}%`} label="Marked on time" />
-        <Metric value={String(data.streak)} label="Recorded-day streak" />
+        <Metric value={`${overall}%`} label={spanish ? "Registradas" : "Recorded"} />
+        <Metric value={`${onTime}%`} label={spanish ? "Marcadas a tiempo" : "Marked on time"} />
+        <Metric value={String(data.streak)} label={spanish ? "Días seguidos registrados" : "Recorded-day streak"} />
       </View>
-      <Text style={styles.chartLabel}>Self-reported dose record</Text>
+      <Text style={styles.chartLabel}>{spanish ? "Registro de dosis autoinformado" : "Self-reported dose record"}</Text>
       <View style={styles.weekRow}>
         {data.days.map((day) => (
           <View key={day.date} style={styles.dayColumn}>
@@ -2546,15 +2566,15 @@ function AdherencePanel({
         ))}
       </View>
       <View style={styles.legend}>
-        <Legend color="#557A66" label="Marked on time" />
-        <Legend color="#B9823E" label="Late" />
-        <Legend color="#B85C4A" label="Missed" />
+        <Legend color="#557A66" label={spanish ? "Marcada a tiempo" : "Marked on time"} />
+        <Legend color="#B9823E" label={spanish ? "Tarde" : "Late"} />
+        <Legend color="#B85C4A" label={spanish ? "Omitida" : "Missed"} />
       </View>
       <View style={styles.insightBox}>
-        <Text style={styles.insightEyebrow}>PATTERN DETECTED</Text>
+        <Text style={styles.insightEyebrow}>{spanish ? "PATRÓN DETECTADO" : "PATTERN DETECTED"}</Text>
         <Text style={styles.insightText}>{data.insight}</Text>
       </View>
-      <Text style={styles.chartLabel}>By medication</Text>
+      <Text style={styles.chartLabel}>{spanish ? "Por medicamento" : "By medication"}</Text>
       {data.byMedication.map((medication) => (
         <View key={medication.name} style={styles.medicationRow}>
           <View
@@ -2581,13 +2601,13 @@ function AdherencePanel({
               />
             </View>
             <Text style={styles.medicationDetail}>
-              {medication.taken} of {medication.expected} doses taken
+              {spanish ? `${medication.taken} de ${medication.expected} dosis marcadas` : `${medication.taken} of ${medication.expected} doses taken`}
             </Text>
           </View>
         </View>
       ))}
       <Pressable onPress={onGenerateReport} style={styles.reportButton}>
-        <Text style={styles.reportButtonText}>Generate self-reported summary</Text>
+        <Text style={styles.reportButtonText}>{spanish ? "Crear resumen autoinformado" : "Generate self-reported summary"}</Text>
         <Text style={styles.reportButtonArrow}>›</Text>
       </Pressable>
     </View>
@@ -3535,6 +3555,7 @@ function SettingsModal({
   onClose: () => void;
   onDismiss: () => void;
 }) {
+  const spanish = settings.language === "es";
   const update = (key: keyof Omit<AppSettings, "language">, value: boolean) =>
     onChange({ ...settings, [key]: value });
   return (
@@ -3549,11 +3570,11 @@ function SettingsModal({
         <View style={styles.modalHeader}>
           <View>
             <Text style={styles.sectionLabel}>CLEARCUE</Text>
-            <Text style={styles.modalTitle}>Accessibility</Text>
+            <Text style={styles.modalTitle}>{spanish ? "Accesibilidad" : "Accessibility"}</Text>
           </View>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Close accessibility settings"
+            accessibilityLabel={spanish ? "Cerrar ajustes de accesibilidad" : "Close accessibility settings"}
             style={styles.close}
             onPress={onClose}
           >
@@ -3562,40 +3583,39 @@ function SettingsModal({
         </View>
         <ScrollView contentContainerStyle={styles.form}>
           <Text style={styles.settingsIntro}>
-            Make ClearCue easier to see, read, and use. These settings are
-            stored only on this device.
+            {spanish ? "Haz que ClearCue sea más fácil de ver, leer y usar. Estos ajustes se guardan solo en este dispositivo." : "Make ClearCue easier to see, read, and use. These settings are stored only on this device."}
           </Text>
           <SettingRow
-            title="Large text"
-            detail="Increase key text and touch targets."
+            title={spanish ? "Texto grande" : "Large text"}
+            detail={spanish ? "Aumenta el texto principal y las áreas táctiles." : "Increase key text and touch targets."}
             value={settings.largeText}
             onChange={(value) => update("largeText", value)}
           />
           <SettingRow
-            title="High contrast"
-            detail="Use stronger contrast between text, buttons, and backgrounds."
+            title={spanish ? "Alto contraste" : "High contrast"}
+            detail={spanish ? "Usa un contraste más fuerte entre texto, botones y fondos." : "Use stronger contrast between text, buttons, and backgrounds."}
             value={settings.highContrast}
             onChange={(value) => update("highContrast", value)}
           />
           <SettingRow
-            title="Reduce motion"
-            detail="Turn off slide animations in ClearCue."
+            title={spanish ? "Reducir movimiento" : "Reduce motion"}
+            detail={spanish ? "Desactiva las animaciones de deslizamiento en ClearCue." : "Turn off slide animations in ClearCue."}
             value={settings.reduceMotion}
             onChange={(value) => update("reduceMotion", value)}
           />
           <SettingRow
-            title="Demo Mode"
-            detail="Load sample medications, history, reports, and refill estimates. Real notifications stay off."
+            title={spanish ? "Modo demo" : "Demo Mode"}
+            detail={spanish ? "Carga medicamentos, historial, informes y estimaciones de muestra. Las notificaciones reales permanecen desactivadas." : "Load sample medications, history, reports, and refill estimates. Real notifications stay off."}
             value={demoMode}
             onChange={onDemoMode}
           />
           {notice && (
             <View style={extraStyles.deleteConfirm}>
-              <Text style={extraStyles.eraseTitle}>Demo Mode did not change</Text>
+              <Text style={extraStyles.eraseTitle}>{spanish ? "El modo demo no cambió" : "Demo Mode did not change"}</Text>
               <Text style={extraStyles.eraseText}>{notice}</Text>
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="Dismiss Demo Mode message"
+                accessibilityLabel={spanish ? "Descartar mensaje del modo demo" : "Dismiss Demo Mode message"}
                 onPress={onDismissNotice}
                 style={styles.choice}
               >
@@ -3606,15 +3626,15 @@ function SettingsModal({
           {demoMode && (
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Reset demo data"
+              accessibilityLabel={spanish ? "Restablecer datos de demo" : "Reset demo data"}
               onPress={onResetDemo}
               style={extraStyles.welcomeGuideButton}
             >
-              <Text style={extraStyles.cardLink}>Reset demo data</Text>
+              <Text style={extraStyles.cardLink}>{spanish ? "Restablecer datos de demo" : "Reset demo data"}</Text>
             </Pressable>
           )}
           <View>
-            <Text style={styles.fieldLabel}>Home screen language / Idioma de inicio</Text>
+            <Text style={styles.fieldLabel}>{spanish ? "Idioma de la aplicación" : "Home screen language / Idioma de inicio"}</Text>
             <View style={styles.choiceRow}>
               {(["en", "es"] as const).map((language) => (
                 <Pressable
@@ -3643,32 +3663,30 @@ function SettingsModal({
               ))}
             </View>
             <Text style={extraStyles.languageSupportNote}>
-              Spanish currently covers the home screen and core routine status.
-              Full-app Spanish is in progress.
+              {spanish ? "ClearCue muestra los controles principales en español. Los nombres de medicamentos y fuentes oficiales se mantienen en su forma original para mayor precisión." : "Spanish covers the main controls. Medication names and official sources keep their original form for accuracy."}
             </Text>
           </View>
           <View style={styles.note}>
-            <Text style={styles.noteTitle}>Color-safe labels</Text>
+            <Text style={styles.noteTitle}>{spanish ? "Etiquetas accesibles por color" : "Color-safe labels"}</Text>
             <Text style={styles.noteText}>
-              Medication cards always name the label color in words, so color is
-              never the only instruction.
+              {spanish ? "Las tarjetas de medicamentos siempre nombran el color de la etiqueta con palabras; el color nunca es la única indicación." : "Medication cards always name the label color in words, so color is never the only instruction."}
             </Text>
           </View>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="View ClearCue welcome guide"
+            accessibilityLabel={spanish ? "Ver guía de bienvenida de ClearCue" : "View ClearCue welcome guide"}
             onPress={onShowOnboarding}
             style={extraStyles.welcomeGuideButton}
           >
-            <Text style={extraStyles.cardLink}>View welcome guide</Text>
+            <Text style={extraStyles.cardLink}>{spanish ? "Ver guía de bienvenida" : "View welcome guide"}</Text>
           </Pressable>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Done adjusting accessibility settings"
+            accessibilityLabel={spanish ? "Terminar de ajustar accesibilidad" : "Done adjusting accessibility settings"}
             onPress={onClose}
             style={styles.saveButton}
           >
-            <Text style={styles.saveText}>Done</Text>
+            <Text style={styles.saveText}>{spanish ? "Listo" : "Done"}</Text>
           </Pressable>
         </ScrollView>
       </SafeAreaView>

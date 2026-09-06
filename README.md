@@ -26,6 +26,11 @@ Local reminder actions and full notification behavior should be tested in an iOS
 
 ## Version history
 
+### v1.26.0 — Spanish home, settings, and insights
+
+- Localized the empty-state add-drop card, Accessibility settings, and the Insights graph—including metrics, legend, pattern summary, and report action.
+- Localized Spanish day labels and adherence-pattern wording; medication names and official source names remain unchanged for accuracy.
+
 ### v1.25.0 — Complete Spanish medication form
 
 - Localized the add/edit medication form’s fields, private details, supply estimate, calendar, reminder-time controls, validation messages, and deletion controls.

@@ -149,7 +149,7 @@ const COPY = {
     settings: "Accessibility settings",
     reminders: "Daily reminders",
     enable: "Enable",
-    synced: "Synced",
+    synced: "Reminders on",
     spacing: "Spacing matters",
     spacingDetail:
       "Leave at least 5 minutes between different drops in the same eye.",
@@ -176,7 +176,7 @@ const COPY = {
     settings: "Ajustes de accesibilidad",
     reminders: "Recordatorios diarios",
     enable: "Activar",
-    synced: "Sincronizado",
+    synced: "Recordatorios activos",
     spacing: "El espacio importa",
     spacingDetail:
       "Deja al menos 5 minutos entre gotas diferentes en el mismo ojo.",
@@ -1528,8 +1528,12 @@ export default function App() {
               </Text>
               <Text style={[styles.reminderText, scaleText]}>
                 {remindersEnabled
-                  ? "Your schedule is synced with iPhone reminders."
-                  : "Turn on gentle reminders for your routine."}
+                  ? settings.language === "es"
+                    ? "Los recordatorios de ClearCue están activos."
+                    : "ClearCue reminders are on."
+                  : settings.language === "es"
+                    ? "Activa recordatorios suaves para tu rutina."
+                    : "Turn on gentle reminders for your routine."}
               </Text>
             </View>
             <Pressable
@@ -2184,13 +2188,14 @@ function AdherencePanel({
   return (
     <View style={styles.insightsPanel}>
       <Text style={styles.sectionLabel}>LAST 7 DAYS</Text>
-      <Text style={styles.insightsTitle}>Adherence insights</Text>
+      <Text style={styles.insightsTitle}>Self-reported routine record</Text>
+      <Text style={styles.settingsIntro}>Based only on doses you mark in ClearCue. It does not verify administration or treatment effectiveness.</Text>
       <View style={styles.metricRow}>
-        <Metric value={`${overall}%`} label="Overall" />
-        <Metric value={`${onTime}%`} label="On time" />
-        <Metric value={String(data.streak)} label="Day streak" />
+        <Metric value={`${overall}%`} label="Recorded" />
+        <Metric value={`${onTime}%`} label="Marked on time" />
+        <Metric value={String(data.streak)} label="Recorded-day streak" />
       </View>
-      <Text style={styles.chartLabel}>Daily dose record</Text>
+      <Text style={styles.chartLabel}>Self-reported dose record</Text>
       <View style={styles.weekRow}>
         {data.days.map((day) => (
           <View key={day.date} style={styles.dayColumn}>
@@ -2218,7 +2223,7 @@ function AdherencePanel({
         ))}
       </View>
       <View style={styles.legend}>
-        <Legend color="#557A66" label="On time" />
+        <Legend color="#557A66" label="Marked on time" />
         <Legend color="#B9823E" label="Late" />
         <Legend color="#B85C4A" label="Missed" />
       </View>
@@ -2259,7 +2264,7 @@ function AdherencePanel({
         </View>
       ))}
       <Pressable onPress={onGenerateReport} style={styles.reportButton}>
-        <Text style={styles.reportButtonText}>Generate shareable report</Text>
+        <Text style={styles.reportButtonText}>Generate self-reported summary</Text>
         <Text style={styles.reportButtonArrow}>›</Text>
       </Pressable>
     </View>
@@ -2308,7 +2313,7 @@ function DoctorReportModal({
   const range = `${start.toLocaleDateString("en-US", { month: "short", day: "numeric" })} – ${end.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`;
   async function shareReport() {
     await Share.share({
-      message: `ClearCue adherence summary\nPeriod: ${range}\nAdherence: ${overall}%\nOn-time doses: ${onTime}%\nMissed doses: ${data.missed}\nLate doses: ${data.late}\nPattern: ${data.insight}\n\nThis patient-generated summary is for discussion with a clinician and is not a medical record.`,
+      message: `ClearCue self-reported routine summary\nPeriod: ${range}\nRecorded doses: ${overall}%\nMarked on time: ${onTime}%\nMissed doses: ${data.missed}\nLate doses: ${data.late}\nPattern: ${data.insight}\n\nThis summary reflects doses the user marked in ClearCue. It does not verify administration, treatment effectiveness, or clinical adherence.`,
     });
   }
   return (
@@ -2358,15 +2363,15 @@ function DoctorReportModal({
             ))}
           </View>
           <View style={styles.reportCard}>
-            <Text style={styles.reportBrand}>CLEARCUE ADHERENCE REPORT</Text>
+            <Text style={styles.reportBrand}>CLEARCUE SELF-REPORTED SUMMARY</Text>
             <Text style={styles.reportRange}>{range}</Text>
             <View style={styles.reportMetricGrid}>
-              <ReportMetric value={`${overall}%`} label="Adherence" />
-              <ReportMetric value={`${onTime}%`} label="On-time doses" />
+              <ReportMetric value={`${overall}%`} label="Recorded doses" />
+              <ReportMetric value={`${onTime}%`} label="Marked on time" />
               <ReportMetric value={String(data.missed)} label="Missed doses" />
               <ReportMetric value={String(data.late)} label="Late doses" />
             </View>
-            <Text style={styles.reportHeading}>Medication adherence</Text>
+            <Text style={styles.reportHeading}>Recorded medication activity</Text>
             {data.byMedication.map((medication) => (
               <View key={medication.name} style={styles.reportMedication}>
                 <Text style={styles.reportMedicationName}>
@@ -2383,8 +2388,8 @@ function DoctorReportModal({
               <Text style={styles.insightText}>{data.insight}</Text>
             </View>
             <Text style={styles.reportDisclaimer}>
-              Patient-generated from locally recorded dose activity. This is an
-              adherence aid, not a medical record or treatment recommendation.
+              This reflects doses the user marked in ClearCue. It does not prove
+              administration, treatment effectiveness, or clinical adherence.
             </Text>
           </View>
           <Pressable
@@ -3234,7 +3239,7 @@ function SettingsModal({
             </Pressable>
           )}
           <View>
-            <Text style={styles.fieldLabel}>Language / Idioma</Text>
+            <Text style={styles.fieldLabel}>Home screen language / Idioma de inicio</Text>
             <View style={styles.choiceRow}>
               {(["en", "es"] as const).map((language) => (
                 <Pressable
@@ -3262,6 +3267,7 @@ function SettingsModal({
                 </Pressable>
               ))}
             </View>
+            <Text style={extraStyles.supplyHelp}>Spanish currently covers the home screen and core routine status. Full-app Spanish is in progress.</Text>
           </View>
           <View style={styles.note}>
             <Text style={styles.noteTitle}>Color-safe labels</Text>

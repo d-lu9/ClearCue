@@ -18,13 +18,19 @@ Local reminder actions and full notification behavior should be tested in an iOS
 - Multiple daily reminder times for a single medication, with safe spacing warnings
 - Validated supply-estimate fields, date checks, and a required clinician-plan confirmation before routine changes are saved
 - Time picker, medication search, brand/alias support, and category filters
-- Daily adherence history, weekly insights, refill estimates, and clinician-shareable reports
+- Self-reported dose history, weekly routine insights, refill estimates, and shareable summaries
 - Clinician-safe “How to use drops” guide, including urgent-symptoms guidance
-- Accessibility defaults: large text, high contrast, VoiceOver labels, reduced motion, color-safe labels, and core Spanish home-screen labels
+- Accessibility defaults: large text, high contrast, VoiceOver labels, reduced motion, color-safe labels, and Spanish home-screen support; full-app Spanish is in progress
 - Demo Mode, onboarding, app icon/splash screen, and device-only privacy controls
 - A focused home screen that prioritizes today’s eye-drop routine; reports, privacy, and accessibility are grouped under More care tools
 
 ## Version history
+
+### v1.11.0 — Clearer reminder and record language
+
+- Renamed the active reminder state to “ClearCue reminders are on” to avoid implying Apple Reminders integration.
+- Clarified that dose history, insights, and shared summaries are self-reported activity—not proof of administration, treatment effectiveness, or clinical adherence.
+- Labeled Spanish as home-screen and core-routine support while full-app translation is completed.
 
 ### v1.10.0 — Safer routine entry
 

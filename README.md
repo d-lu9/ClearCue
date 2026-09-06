@@ -20,93 +20,28 @@ Local reminder actions and full notification behavior should be tested in an iOS
 - Time picker, medication search, brand/alias support, category filters, and a reviewed offline catalog of common glaucoma, dry-eye, allergy, and clinician-directed post-operative drops
 - Self-reported dose history, weekly routine insights, refill estimates, and shareable summaries
 - Clinician-safe “How to use drops” guide, including urgent-symptoms guidance
-- Accessibility defaults: large text, high contrast, VoiceOver labels, reduced motion, color-safe labels, and Spanish home-screen support; full-app Spanish is in progress
+- Accessibility defaults: large text, high contrast, VoiceOver labels, reduced motion, color-safe labels, and Spanish across the core routine, Settings, and Insights
 - Demo Mode, onboarding, app icon/splash screen, and device-only privacy controls
 - A focused home screen that prioritizes today’s eye-drop routine; reports, privacy, and accessibility are grouped under More care tools
 
-## Version history
+## Release highlights
 
-### v1.26.0 — Spanish home, settings, and insights
+### Current release — v1.26
 
-- Localized the empty-state add-drop card, Accessibility settings, and the Insights graph—including metrics, legend, pattern summary, and report action.
-- Localized Spanish day labels and adherence-pattern wording; medication names and official source names remain unchanged for accuracy.
+- One clear home card per medication, even when it has several daily times; each time keeps its own completion and history actions.
+- A calmer onboarding experience: the full welcome guide appears only on first launch, after an intentional erase-all-data action, or when opened from Settings.
+- Spanish coverage for the core routine, medication form, calendar/time controls, Settings, and Insights. Drug and official source names remain unchanged for accuracy.
 
-### v1.25.0 — Complete Spanish medication form
+### Reliability and safety
 
-- Localized the add/edit medication form’s fields, private details, supply estimate, calendar, reminder-time controls, validation messages, and deletion controls.
-- Kept medication names and official source names intact while translating the surrounding interface and accessibility labels.
+- Required clinician-plan confirmation, date/number checks, supply and spacing warnings, and clear self-reported-adherence language.
+- iOS sheet transitions are sequenced to avoid overlapping screens; save, refresh, and Demo Mode actions guard against duplicate taps and background work stays non-interrupting.
+- Routine changes save immediately. When reminders are active, people choose when to refresh scheduled notifications.
 
-### v1.24.0 — Calmer welcome behavior
+### Product focus
 
-- Full welcome onboarding now appears only on a first launch, after an intentional erase-all-data action, or when chosen manually from Settings.
-- Deleting the last medication now stays on the lightweight empty state instead of reopening onboarding.
-
-### v1.23.0 — Clearer multi-time routines and Spanish core flow
-
-- Grouped every daily time for the same medication into one home card while retaining separate history and Taken actions for each scheduled time.
-- Expanded Spanish through medication cards and the main add-medication flow, including search, reviewable medication sources, and multi-time entry controls.
-
-### v1.22.0 — Cohesive interaction safeguards
-
-- Audited active app interactions for overlapping sheets, native alert interruptions, repeated taps, and competing device work.
-- Kept actionable messages inside their active screen and made background storage operations non-interrupting, so routine updates stay responsive even if a background write fails.
-
-### v1.21.0 — Normal-mode interruption audit
-
-- Made Demo Mode switch to its visible routine immediately and isolated notification and storage cleanup from the interaction; duplicate mode and reminder operations are ignored while one is already in progress.
-- Replaced routine-validation and data-erasure system alerts with in-sheet confirmations, preventing alert-over-sheet interruptions.
-- Extended dismissal-based sheet sequencing to Care Tools, Privacy, Accessibility settings, and the welcome guide.
-
-### v1.20.0 — Deterministic sheet sequencing
-
-- Made the edit-to-review and review-to-edit transitions wait for iOS to finish dismissing the prior sheet before presenting the next one, replacing the previous timing-based handoff.
-- This removes the remaining sheet-presentation race that could leave the interface unresponsive after saving or returning to an edit, especially in Demo Mode.
-
-### v1.19.0 — Native sheet reliability
-
-- Prevented the review sheet from being presented over the still-open edit sheet on iOS; routine review now follows a clean sheet transition.
-- Replaced the native deletion alert with an in-sheet confirmation, keeping deletion responsive in Demo Mode and on device.
-
-### v1.18.0 — Save and delete responsiveness
-
-- Removed native notification rebuilding from the automatic save and delete path, preventing those actions from waiting on iOS notification work.
-- When an active routine changes, ClearCue now shows a clear “Refresh reminders” control. The routine is saved immediately; reminder updates happen only when the person deliberately requests them.
-
-### v1.17.0 — Background-work stability
-
-- Fixed a no-op daily refresh that recreated the medication routine every minute even when completion had not changed.
-- Limited reminder rescheduling to actual schedule, supply, or notification-detail changes rather than dose-history updates.
-- Deferred and serialized native notification work, and scheduled notifications one at a time to avoid flooding the device after a routine update.
-
-### v1.16.0 — Editing reliability and custom-time controls
-
-- Serialized reminder rescheduling after routine edits so notification work cannot overlap or block the save experience.
-- Added a clock-style custom-time picker with hour dial, five-minute selections, AM/PM controls, and precise manual entry.
-- Moved the Spanish-support note below the language choices with intentional spacing.
-
-### v1.15.0 — Routine-entry polish
-
-- Centered multi-line insight labels, including the recorded-day streak, for a more balanced layout.
-- Added optional prescriber and pharmacy phone fields with a phone keypad and sensible input limits.
-- Replaced the active bottle-opened date text field with an accessible in-app calendar picker; the removed contact-lens and glasses prescription expiration forms remain removed to keep ClearCue focused.
-
-### v1.14.0 — Catalog traceability and beta polish
-
-- Added an optional, medication-specific DailyMed source search from the selected catalog entry; it opens only when a person chooses it and has an internet connection.
-- Added a clear “Show all results” control so the growing catalog remains quick to browse without hiding matches.
-- Refined routine wording and filter spacing to avoid the small visual text misalignments in the medication picker.
-
-### v1.13.0 — Expanded medication use-case browsing
-
-- Expanded the offline catalog to 48 reviewed ophthalmic products and product families, including common lubricant ingredients, allergy treatments, antibiotics, anti-inflammatory drops, and redness relievers.
-- Added use-case browsing for eye pressure, dry eye and lubricants, allergy, infection, inflammation and post-operative care, and redness relief.
-- Added additional commonly labeled medications verified through the same DailyMed and FDA openFDA review process, while leaving all dosing and treatment decisions to the clinician and prescription label.
-
-### v1.12.0 — Reviewed offline medication catalog
-
-- Expanded the bundled recognition catalog with common glaucoma and ocular-hypertension drops (including combination products), dry-eye treatments, allergy drops, and clinician-directed anti-inflammatory and antibiotic drops.
-- Every catalog entry now identifies its source as the current [DailyMed](https://dailymed.nlm.nih.gov/dailymed) label, cross-checked against the FDA's [openFDA drug-label data](https://open.fda.gov/apis/drug/label/), with a visible review date.
-- Kept catalog data offline, versioned with the app, and intentionally free of dosing directions, contraindication guidance, or treatment recommendations.
+- ClearCue is intentionally focused on reliable eye-drop routines. Contact-lens and glasses prescription records were removed from the active app.
+- The offline medication-recognition catalog is reviewed against DailyMed and FDA openFDA labels; it never provides dosing recommendations.
 
 ## Medication catalog sources and updates
 
@@ -116,70 +51,6 @@ ClearCue's medication catalog is a recognition aid, not a clinical reference or 
 - The FDA's [openFDA drug-label data](https://open.fda.gov/apis/drug/label/), used as a second label-data cross-check.
 
 Catalog changes are reviewed and shipped in app releases rather than downloaded silently to a person's phone. The app shows the source and review date on the selected medication and offers a medication-specific DailyMed source search when the device is online. Because manufacturers can publish separate current labels for the same medication, that search is safer than pinning a person to one manufacturer or an outdated label version. The prescription label and clinician remain the only source of medication instructions.
-
-### v1.11.0 — Clearer reminder and record language
-
-- Renamed the active reminder state to “ClearCue reminders are on” to avoid implying Apple Reminders integration.
-- Clarified that dose history, insights, and shared summaries are self-reported activity—not proof of administration, treatment effectiveness, or clinical adherence.
-- Labeled Spanish as home-screen and core-routine support while full-app translation is completed.
-
-### v1.10.0 — Safer routine entry
-
-- Added numeric and real-date checks for supply estimates, while preserving room for unusual but valid clinician instructions.
-- Added a read-only routine review with required confirmation against the clinician’s prescription before saving.
-- Added warnings for reminder-count mismatches and future or unusually old bottle-opened dates.
-
-### v1.9.0 — Focused eye-drop routine
-
-- Removed contact-lens and glasses-prescription records, including their reference forms and reminders.
-- Simplified supporting tools to keep ClearCue centered on taking eye drops reliably.
-
-### v1.8.0 — Focused routine dashboard
-
-- Simplified the home screen around daily progress, today’s schedule, reminders, and adding an eye drop.
-- Moved insights, privacy controls, and accessibility settings into a single Care & settings sheet.
-
-### v1.7.0 — Glasses prescription reference
-
-- Added a local glasses prescription record with separate right/left values, PD, prism, clinician, expiration, and frame or lens notes.
-- Added a local glasses-prescription expiration reminder and included glasses details in ClearCue’s privacy and erase-data controls.
-
-### v1.6.0 — Routine and reminder polish
-
-- Added multiple daily times under one medication, expandable time pickers, and group editing/removal.
-- Added notification actions for Taken, Snooze 10 minutes, and Skip.
-- Added local contact-lens expiration and replacement reminders.
-- Added medication category filters for glaucoma, dry eye, allergy, and post-operative care.
-- Updated Expo and safe-area support.
-
-### v1.5.0 — Contact lenses and interface improvements
-
-- Added a local contact-lens prescription reference with right/left lens values, renewal details, and replacement planning.
-- Added a clinician-safe urgent-symptoms note to the drop-application guide.
-- Added the reminder-time dropdown and Calm Clinic interface refinements.
-
-### v1.4.0 — Presentation and demo experience
-
-- Added the ClearCue icon, splash screen, polished empty states, Demo Mode, and expanded Spanish home-screen support.
-- Made insights, reports, privacy, history, and settings easier to find.
-
-### v1.3.0 — Privacy, safety, and patient records
-
-- Added private prescription details, refill estimates, contact-lens planning, dose history, and a read-only shareable report.
-- Added device-only privacy controls, onboarding, clinician application instructions, and supply estimates.
-
-### v1.2.0 — Accessible adherence support
-
-- Added weekly adherence tracking, streaks, medication-level insights, and Doctor Reports.
-- Added large text, high contrast, VoiceOver labels, reduced motion, color-safe labels, and Spanish foundations.
-
-### v1.1.0 — Medication and reminder foundations
-
-- Added an offline eye-medication catalog, medication editing/deletion, daily completion reset, safe reminder spacing, and local notifications.
-
-### v1.0.0 — ClearCue prototype
-
-- Created the original dashboard, eye-specific medication cards, local routine storage, and an iPhone-first Expo prototype.
 
 ## Next milestone
 

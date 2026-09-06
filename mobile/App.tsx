@@ -569,6 +569,16 @@ const extraStyles = StyleSheet.create({
   medicationBody: { flex: 1, padding: 15 },
   medicationTop: { flexDirection: "row", gap: 12 },
   timeBlock: { alignItems: "flex-end", gap: 6 },
+  groupedTimes: { marginTop: 14, gap: 9 },
+  groupedTimeRow: {
+    borderTopWidth: 1,
+    borderTopColor: "#F2EBE4",
+    paddingTop: 10,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 10,
+  },
   statusBadge: {
     borderRadius: 8,
     paddingHorizontal: 7,
@@ -836,6 +846,33 @@ function supplyEstimate(supply?: Supply) {
     isWarning: remaining <= supply.warningDays,
     warningDate,
   };
+}
+function groupRoutineDoses(doses: Dose[]) {
+  const groups = new Map<string, Dose[]>();
+  doses.forEach((dose) => {
+    const id = dose.scheduleGroupId ?? dose.id;
+    groups.set(id, [...(groups.get(id) ?? []), dose]);
+  });
+  return [...groups.entries()]
+    .map(([id, groupedDoses]) => ({
+      id,
+      doses: [...groupedDoses].sort(
+        (a, b) =>
+          (parseReminderTime(a.time)?.hour ?? 0) * 60 +
+          (parseReminderTime(a.time)?.minute ?? 0) -
+            ((parseReminderTime(b.time)?.hour ?? 0) * 60 +
+              (parseReminderTime(b.time)?.minute ?? 0)),
+      ),
+    }))
+    .sort((a, b) => a.doses[0].name.localeCompare(b.doses[0].name));
+}
+function localizedEye(eye: Eye, language: "en" | "es") {
+  if (language === "en") return eye;
+  return eye === "Left eye"
+    ? "Ojo izquierdo"
+    : eye === "Right eye"
+      ? "Ojo derecho"
+      : "Ambos ojos";
 }
 
 async function scheduleReminders(
@@ -1172,6 +1209,7 @@ export default function App() {
     [doses, history, trackingStart, reportDays],
   );
   const historyDose = doses.find((dose) => dose.id === historyDoseId) ?? null;
+  const routineGroups = useMemo(() => groupRoutineDoses(doses), [doses]);
   const copy = COPY[settings.language];
   const scaleText = settings.largeText ? styles.largeText : undefined;
   const scaleHeading = settings.largeText
@@ -1692,16 +1730,16 @@ export default function App() {
             </View>
           </View>
           <View style={styles.list}>
-            {doses.length ? (
-              doses.map((dose) => (
+            {routineGroups.length ? (
+              routineGroups.map((group) => (
                 <DoseCard
-                  key={dose.id}
-                  dose={dose}
+                  key={group.id}
+                  doses={group.doses}
                   language={settings.language}
                   largeText={settings.largeText}
-                  onToggle={() => toggleDose(dose.id)}
-                  onEdit={() => editDose(dose)}
-                  onHistory={() => setHistoryDoseId(dose.id)}
+                  onToggle={toggleDose}
+                  onEdit={() => editDose(group.doses[0])}
+                  onHistory={setHistoryDoseId}
                 />
               ))
             ) : (
@@ -1815,6 +1853,7 @@ export default function App() {
           applicationsPerDay={applicationsPerDay}
           openedOn={openedOn}
           warningDays={warningDays}
+          language={settings.language}
           deleteConfirming={deleteConfirming}
           formNotice={routineFormNotice}
           selectedMedication={selectedMedication}
@@ -1879,6 +1918,7 @@ export default function App() {
         applicationsPerDay={applicationsPerDay}
         openedOn={openedOn}
         warningDays={warningDays}
+        language={settings.language}
         confirmed={routineConfirmed}
         onConfirmed={setRoutineConfirmed}
         onBack={() => {
@@ -2173,43 +2213,41 @@ function HomeAction({
   );
 }
 function DoseCard({
-  dose,
+  doses,
   language,
   largeText,
   onToggle,
   onEdit,
   onHistory,
 }: {
-  dose: Dose;
+  doses: Dose[];
   language: "en" | "es";
   largeText: boolean;
-  onToggle: () => void;
+  onToggle: (id: string) => void;
   onEdit: () => void;
-  onHistory: () => void;
+  onHistory: (id: string) => void;
 }) {
+  const dose = doses[0];
   const colorName =
     COLOR_NAMES[dose.color]?.[language] ??
     (language === "es" ? "Personalizado" : "Custom");
-  const status = dose.completed
-    ? language === "es"
-      ? "Completado"
-      : "Completed"
-    : language === "es"
-      ? "Pendiente"
-      : "Due today";
   const estimate = supplyEstimate(dose.supply);
   const estimateText = estimate
     ? estimate.isWarning
-      ? `Refill estimate: about ${estimate.days} day${estimate.days === 1 ? "" : "s"} left`
-      : `Supply estimate: about ${estimate.days} day${estimate.days === 1 ? "" : "s"} left`
+      ? language === "es"
+        ? `Estimación de reposición: quedan aproximadamente ${estimate.days} día${estimate.days === 1 ? "" : "s"}`
+        : `Refill estimate: about ${estimate.days} day${estimate.days === 1 ? "" : "s"} left`
+      : language === "es"
+        ? `Estimación de suministro: quedan aproximadamente ${estimate.days} día${estimate.days === 1 ? "" : "s"}`
+        : `Supply estimate: about ${estimate.days} day${estimate.days === 1 ? "" : "s"} left`
     : null;
   return (
     <View
       accessible
-      accessibilityLabel={`${dose.name}, ${dose.eye}, ${colorName} label, scheduled ${dose.time}, ${status}${estimateText ? `, ${estimateText}` : ""}`}
+      accessibilityLabel={`${dose.name}, ${dose.eye}, ${colorName} label, ${doses.length} scheduled reminder${doses.length === 1 ? "" : "s"}${estimateText ? `, ${estimateText}` : ""}`}
       style={[
         extraStyles.medicationCard,
-        dose.completed && extraStyles.completedMedicationCard,
+        doses.every((item) => item.completed) && extraStyles.completedMedicationCard,
       ]}
     >
       <View
@@ -2222,22 +2260,7 @@ function DoseCard({
               {dose.name}
             </Text>
             <Text style={[styles.doseDetails, largeText && styles.largeText]}>
-              {dose.eye} · {colorName} label
-            </Text>
-          </View>
-          <View style={extraStyles.timeBlock}>
-            <Text style={[styles.time, largeText && styles.largeText]}>
-              {dose.time}
-            </Text>
-            <Text
-              style={[
-                extraStyles.statusBadge,
-                dose.completed
-                  ? extraStyles.statusComplete
-                  : extraStyles.statusDue,
-              ]}
-            >
-              {status}
+              {localizedEye(dose.eye, language)} · {language === "es" ? "etiqueta" : "label"} {colorName}
             </Text>
           </View>
         </View>
@@ -2251,35 +2274,77 @@ function DoseCard({
             {estimateText}
           </Text>
         )}
+        <View style={extraStyles.groupedTimes}>
+          {doses.map((scheduledDose) => {
+            const status = scheduledDose.completed
+              ? language === "es"
+                ? "Completado"
+                : "Completed"
+              : language === "es"
+                ? "Pendiente"
+                : "Due today";
+            return (
+              <View key={scheduledDose.id} style={extraStyles.groupedTimeRow}>
+                <View style={extraStyles.timeBlock}>
+                  <Text style={[styles.time, largeText && styles.largeText]}>
+                    {scheduledDose.time}
+                  </Text>
+                  <Text
+                    style={[
+                      extraStyles.statusBadge,
+                      scheduledDose.completed
+                        ? extraStyles.statusComplete
+                        : extraStyles.statusDue,
+                    ]}
+                  >
+                    {status}
+                  </Text>
+                </View>
+                <View style={extraStyles.cardLinks}>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={`View ${dose.name} history for ${scheduledDose.time}`}
+                    onPress={() => onHistory(scheduledDose.id)}
+                  >
+                    <Text style={extraStyles.cardLink}>
+                      {language === "es" ? "Historial" : "History"}
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={`${scheduledDose.completed ? "Mark incomplete" : "Mark as taken"}: ${dose.name} at ${scheduledDose.time}`}
+                    accessibilityHint="Records this dose in adherence history"
+                    onPress={() => onToggle(scheduledDose.id)}
+                    style={[styles.doneButton, scheduledDose.completed && styles.checkedButton]}
+                  >
+                    <Text style={styles.doneText}>
+                      {scheduledDose.completed
+                        ? language === "es"
+                          ? "✓ Tomada"
+                          : "✓ Taken"
+                        : language === "es"
+                          ? "Marcar tomada"
+                          : "Mark taken"}
+                    </Text>
+                  </Pressable>
+                </View>
+              </View>
+            );
+          })}
+        </View>
         <View style={extraStyles.medicationFooter}>
           <View style={extraStyles.cardLinks}>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={`View ${dose.name} dose history`}
-              onPress={onHistory}
-            >
-              <Text style={extraStyles.cardLink}>History</Text>
-            </Pressable>
-            <Text style={extraStyles.cardLinkDivider}>·</Text>
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={`Edit ${dose.name}`}
               onPress={onEdit}
             >
-              <Text style={extraStyles.cardLink}>Edit</Text>
+              <Text style={extraStyles.cardLink}>{language === "es" ? "Editar" : "Edit"}</Text>
             </Pressable>
           </View>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={`${dose.completed ? "Mark incomplete" : "Mark as taken"}: ${dose.name}`}
-            accessibilityHint="Records this dose in adherence history"
-            onPress={onToggle}
-            style={[styles.doneButton, dose.completed && styles.checkedButton]}
-          >
-            <Text style={styles.doneText}>
-              {dose.completed ? "✓ Taken" : "Mark taken"}
-            </Text>
-          </Pressable>
+          <Text style={extraStyles.supplyHelp}>
+            {language === "es" ? "Cada hora se registra por separado." : "Each time is tracked separately."}
+          </Text>
         </View>
       </View>
     </View>
@@ -3832,6 +3897,7 @@ type ModalProps = {
   applicationsPerDay: string;
   openedOn: string;
   warningDays: string;
+  language: "en" | "es";
   deleteConfirming: boolean;
   formNotice: { title: string; message: string; allowReview?: boolean } | null;
   selectedMedication: CatalogMedication | null;
@@ -3862,7 +3928,7 @@ type ModalProps = {
   onCancelDelete: () => void;
   onConfirmDelete: () => void;
 };
-function RoutineReviewModal({ visible, animation, name, eye, times, clinicianInstructions, bottleMl, dropsPerApplication, applicationsPerDay, openedOn, warningDays, confirmed, onConfirmed, onBack, onDismiss, onSave }: { visible: boolean; animation: "none" | "slide"; name: string; eye: Eye; times: string[]; clinicianInstructions: string; bottleMl: string; dropsPerApplication: string; applicationsPerDay: string; openedOn: string; warningDays: string; confirmed: boolean; onConfirmed: (value: boolean) => void; onBack: () => void; onDismiss: () => void; onSave: () => void }) {
+function RoutineReviewModal({ visible, animation, name, eye, times, clinicianInstructions, bottleMl, dropsPerApplication, applicationsPerDay, openedOn, warningDays, language, confirmed, onConfirmed, onBack, onDismiss, onSave }: { visible: boolean; animation: "none" | "slide"; name: string; eye: Eye; times: string[]; clinicianInstructions: string; bottleMl: string; dropsPerApplication: string; applicationsPerDay: string; openedOn: string; warningDays: string; language: "en" | "es"; confirmed: boolean; onConfirmed: (value: boolean) => void; onBack: () => void; onDismiss: () => void; onSave: () => void }) {
   const warnings: string[] = [];
   if (bottleMl && Number(applicationsPerDay) !== times.length) warnings.push(`This routine has ${times.length} reminder${times.length === 1 ? "" : "s"}, while the supply estimate says ${applicationsPerDay} use${Number(applicationsPerDay) === 1 ? "" : "s"} per day. Confirm both against the prescription label.`);
   if (bottleMl && isValidIsoDate(openedOn)) {
@@ -3874,6 +3940,7 @@ function RoutineReviewModal({ visible, animation, name, eye, times, clinicianIns
   return <Modal visible={visible} animationType={animation} presentationStyle="pageSheet" onRequestClose={onBack} onDismiss={onDismiss}><SafeAreaView style={styles.modalScreen}><View style={styles.modalHeader}><View><Text style={styles.sectionLabel}>REVIEW ROUTINE</Text><Text style={styles.modalTitle}>Check before saving</Text></View><Pressable accessibilityRole="button" accessibilityLabel="Return to routine editing" onPress={onBack} style={styles.close}><Text style={styles.closeText}>×</Text></Pressable></View><ScrollView contentContainerStyle={styles.form}><View style={styles.note}><Text style={styles.noteTitle}>ClearCue supports your plan</Text><Text style={styles.noteText}>ClearCue does not diagnose, prescribe, validate a clinical treatment plan, or replace your clinician’s instructions or prescription label.</Text></View><View style={extraStyles.detailsSection}><Text style={styles.fieldLabel}>{name}</Text><Text style={extraStyles.supplyHelp}>{eye} · {times.join(" · ")}</Text>{clinicianInstructions ? <Text style={extraStyles.supplyHelp}>Clinician instructions: {clinicianInstructions}</Text> : null}{bottleMl ? <Text style={extraStyles.supplyHelp}>Supply estimate: {bottleMl} mL · {dropsPerApplication} drop{Number(dropsPerApplication) === 1 ? "" : "s"} each use · {applicationsPerDay} use{Number(applicationsPerDay) === 1 ? "" : "s"} daily · opened {openedOn} · warning {warningDays} days before estimate</Text> : <Text style={extraStyles.supplyHelp}>No supply estimate added.</Text>}</View>{warnings.map((warning) => <View key={warning} style={extraStyles.eraseSection}><Text style={extraStyles.eraseTitle}>Review this detail</Text><Text style={extraStyles.eraseText}>{warning}</Text></View>)}<Pressable accessibilityRole="checkbox" accessibilityState={{ checked: confirmed }} accessibilityLabel="I checked these values against my clinician's prescription" onPress={() => onConfirmed(!confirmed)} style={[styles.choice, confirmed && styles.choiceSelected]}><Text style={[styles.choiceText, confirmed && styles.choiceTextSelected]}>{confirmed ? "✓ " : ""}I checked these values against my clinician’s prescription.</Text></Pressable><Pressable accessibilityRole="button" accessibilityState={{ disabled: !confirmed }} accessibilityLabel="Save reviewed eye drop routine" disabled={!confirmed} onPress={onSave} style={[styles.saveButton, !confirmed && { opacity: 0.45 }]}><Text style={styles.saveText}>Save routine</Text></Pressable><Pressable accessibilityRole="button" accessibilityLabel="Return to routine editing" onPress={onBack} style={extraStyles.emptyGuide}><Text style={extraStyles.cardLink}>Go back and edit</Text></Pressable></ScrollView></SafeAreaView></Modal>;
 }
 function AddMedicationModal(props: ModalProps) {
+  const spanish = props.language === "es";
   const [medicationFilter, setMedicationFilter] =
     useState<MedicationFilter>("All");
   const [showAllSuggestions, setShowAllSuggestions] = useState(false);
@@ -3893,10 +3960,22 @@ function AddMedicationModal(props: ModalProps) {
         <View style={styles.modalHeader}>
           <View>
             <Text style={styles.sectionLabel}>
-              {props.isEditing ? "EDIT ROUTINE" : "NEW ROUTINE"}
+              {props.isEditing
+                ? props.language === "es"
+                  ? "EDITAR RUTINA"
+                  : "EDIT ROUTINE"
+                : props.language === "es"
+                  ? "NUEVA RUTINA"
+                  : "NEW ROUTINE"}
             </Text>
             <Text style={styles.modalTitle}>
-              {props.isEditing ? "Edit eye drop" : "Add eye drop"}
+              {props.isEditing
+                ? props.language === "es"
+                  ? "Editar gotas"
+                  : "Edit eye drop"
+                : props.language === "es"
+                  ? "Añadir gotas"
+                  : "Add eye drop"}
             </Text>
           </View>
           <Pressable
@@ -3912,21 +3991,21 @@ function AddMedicationModal(props: ModalProps) {
           contentContainerStyle={styles.form}
           keyboardShouldPersistTaps="handled"
         >
-          <Field label="Search eye medications">
+          <Field label={props.language === "es" ? "Buscar medicamentos oftálmicos" : "Search eye medications"}>
             <TextInput
-              accessibilityLabel="Search eye medications"
+              accessibilityLabel={props.language === "es" ? "Buscar medicamentos oftálmicos" : "Search eye medications"}
               value={props.name}
               onChangeText={(value) => {
                 setShowAllSuggestions(false);
                 props.onName(value);
               }}
-              placeholder="Generic, brand, or common name"
+              placeholder={props.language === "es" ? "Nombre genérico, marca o nombre común" : "Generic, brand, or common name"}
               placeholderTextColor="#81969A"
               style={styles.input}
             />
           </Field>
           <View>
-            <Text style={styles.fieldLabel}>Browse by use</Text>
+            <Text style={styles.fieldLabel}>{props.language === "es" ? "Explorar por uso" : "Browse by use"}</Text>
             <View style={extraStyles.filterRow}>
               {MEDICATION_FILTERS.map((filter) => (
                 <Pressable
@@ -3998,7 +4077,7 @@ function AddMedicationModal(props: ModalProps) {
                 style={extraStyles.emptyGuide}
               >
                 <Text style={extraStyles.cardLink}>
-                  Show all {suggestions.length} results
+                  {spanish ? `Mostrar los ${suggestions.length} resultados` : `Show all ${suggestions.length} results`}
                 </Text>
               </Pressable>
             ) : null}
@@ -4046,8 +4125,9 @@ function AddMedicationModal(props: ModalProps) {
                   marginTop: 8,
                 }}
               >
-                Use the instructions on your prescription label and from your
-                clinician. ClearCue does not provide dosing directions.
+                {spanish
+                  ? "Sigue las instrucciones de la etiqueta y de tu profesional de salud. ClearCue no proporciona indicaciones de dosis."
+                  : "Use the instructions on your prescription label and from your clinician. ClearCue does not provide dosing directions."}
               </Text>
               <Text style={{ fontSize: 10, color: "#6F625B", marginTop: 7 }}>
                 {props.selectedMedication.prescriptionStatus ??
@@ -4068,26 +4148,26 @@ function AddMedicationModal(props: ModalProps) {
                 style={{ alignSelf: "flex-start", marginTop: 6 }}
               >
                 <Text style={extraStyles.cardLink}>
-                  View DailyMed sources (requires internet)
+                  {spanish ? "Ver fuentes de DailyMed (requiere internet)" : "View DailyMed sources (requires internet)"}
                 </Text>
               </Pressable>
             </View>
           )}
           <TimePicker
-            label="First daily reminder"
+            label={spanish ? "Primer recordatorio diario" : "First daily reminder"}
             value={props.time}
             onChange={props.onTime}
           />
           <View style={extraStyles.extraTimes}>
-            <Text style={styles.fieldLabel}>Additional daily reminders</Text>
+            <Text style={styles.fieldLabel}>{spanish ? "Recordatorios diarios adicionales" : "Additional daily reminders"}</Text>
             <Text style={extraStyles.supplyHelp}>
-              Use this when the same medication is taken more than once a day.
+              {spanish ? "Úsalo si tomas el mismo medicamento más de una vez al día." : "Use this when the same medication is taken more than once a day."}
             </Text>
             {props.additionalTimes.map((item, index) => (
               <View key={`${index}-${item}`} style={extraStyles.extraTimeRow}>
                 <View style={{ flex: 1 }}>
                   <TimePicker
-                    label={`Reminder ${index + 2}`}
+                    label={spanish ? `Recordatorio ${index + 2}` : `Reminder ${index + 2}`}
                     value={item}
                     onChange={(value) =>
                       props.onAdditionalTimes(
@@ -4123,16 +4203,16 @@ function AddMedicationModal(props: ModalProps) {
               style={extraStyles.addTime}
             >
               <Text style={extraStyles.addTimeText}>
-                ＋ Add another daily time
+                {spanish ? "＋ Añadir otra hora diaria" : "＋ Add another daily time"}
               </Text>
             </Pressable>
           </View>
-          <Field label="Clinician application instructions (optional)">
+          <Field label={spanish ? "Instrucciones de aplicación del profesional (opcional)" : "Clinician application instructions (optional)"}>
             <TextInput
               accessibilityLabel="Clinician application instructions"
               value={props.clinicianInstructions}
               onChangeText={props.onClinicianInstructions}
-              placeholder="Copy the instructions from your clinician or prescription label"
+              placeholder={spanish ? "Copia las instrucciones de tu profesional o de la etiqueta" : "Copy the instructions from your clinician or prescription label"}
               placeholderTextColor="#81969A"
               multiline
               style={[

@@ -26,6 +26,11 @@ Local reminder actions and full notification behavior should be tested in an iOS
 
 ## Version history
 
+### v1.23.0 — Clearer multi-time routines and Spanish core flow
+
+- Grouped every daily time for the same medication into one home card while retaining separate history and Taken actions for each scheduled time.
+- Expanded Spanish through medication cards and the main add-medication flow, including search, reviewable medication sources, and multi-time entry controls.
+
 ### v1.22.0 — Cohesive interaction safeguards
 
 - Audited active app interactions for overlapping sheets, native alert interruptions, repeated taps, and competing device work.

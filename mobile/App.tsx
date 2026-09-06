@@ -919,10 +919,18 @@ export default function App() {
   const [applicationsPerDay, setApplicationsPerDay] = useState("1");
   const [openedOn, setOpenedOn] = useState(dateKey(new Date()));
   const [warningDays, setWarningDays] = useState("7");
+  const [routineFormNotice, setRoutineFormNotice] = useState<{
+    title: string;
+    message: string;
+    allowReview?: boolean;
+  } | null>(null);
   const [selectedMedication, setSelectedMedication] =
     useState<CatalogMedication | null>(null);
   const [hydrated, setHydrated] = useState(false);
   const [demoMode, setDemoMode] = useState(false);
+  const demoTransitionInProgress = useRef(false);
+  const reminderUpdateInProgress = useRef(false);
+  const routineSaveInProgress = useRef(false);
   const personalSnapshot = useRef<{
     doses: Dose[];
     history: DoseLog[];
@@ -944,6 +952,11 @@ export default function App() {
   const [routineConfirmed, setRoutineConfirmed] = useState(false);
   const [deleteConfirming, setDeleteConfirming] = useState(false);
   const [careToolsOpen, setCareToolsOpen] = useState(false);
+  const [pendingCareSheet, setPendingCareSheet] = useState<
+    "privacy" | "settings" | null
+  >(null);
+  const [showOnboardingAfterSettings, setShowOnboardingAfterSettings] =
+    useState(false);
   const [historyDoseId, setHistoryDoseId] = useState<string | null>(null);
   const [reportDays, setReportDays] = useState<7 | 30>(7);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -1201,29 +1214,30 @@ export default function App() {
     recordDose(id, "taken");
   }
   function saveDose() {
+    setRoutineFormNotice(null);
     if (!name.trim()) {
-      Alert.alert(
-        "Add a medication name",
-        "For example, Artificial Tears or Prednisolone Acetate.",
-      );
+      setRoutineFormNotice({
+        title: "Add a medication name",
+        message: "For example, Artificial Tears or Prednisolone Acetate.",
+      });
       return;
     }
     const allTimes = [time, ...additionalTimes];
     if (allTimes.some((item) => !parseReminderTime(item))) {
-      Alert.alert(
-        "Use a time like 8:00 AM",
-        "ClearCue needs a valid time for every daily reminder.",
-      );
+      setRoutineFormNotice({
+        title: "Use a time like 8:00 AM",
+        message: "ClearCue needs a valid time for every daily reminder.",
+      });
       return;
     }
     if (
       new Set(allTimes.map((item) => item.trim().toUpperCase())).size !==
       allTimes.length
     ) {
-      Alert.alert(
-        "Choose different times",
-        "Each daily reminder for this medication needs its own time.",
-      );
+      setRoutineFormNotice({
+        title: "Choose different times",
+        message: "Each daily reminder for this medication needs its own time.",
+      });
       return;
     }
     if (
@@ -1240,10 +1254,10 @@ export default function App() {
         !Number.isInteger(Number(warningDays)) ||
         !isValidIsoDate(openedOn))
     ) {
-      Alert.alert(
-        "Check the supply estimate",
-        "Enter a positive numeric bottle size and drops per use, whole-number uses and warning days, and a real date like 2026-09-05—or leave bottle size blank to skip the estimate.",
-      );
+      setRoutineFormNotice({
+        title: "Check the supply estimate",
+        message: "Enter a positive numeric bottle size and drops per use, whole-number uses and warning days, and a real date like 2026-09-05—or leave bottle size blank to skip the estimate.",
+      });
       return;
     }
     const editingGroup =
@@ -1257,19 +1271,18 @@ export default function App() {
         allTimes.some((item) => (minutesBetween(dose.time, item) ?? 999) < 5),
     );
     if (closeDose) {
-      Alert.alert(
-        "These drops are very close together",
-        `${closeDose.name} is scheduled at ${closeDose.time}. Confirm the spacing in the clinician’s instructions before saving.`,
-        [
-          { text: "Go back", style: "cancel" },
-          { text: "Review routine", onPress: openRoutineReview },
-        ],
-      );
+      setRoutineFormNotice({
+        title: "These drops are very close together",
+        message: `${closeDose.name} is scheduled at ${closeDose.time}. Confirm the spacing in the clinician’s instructions before saving.`,
+        allowReview: true,
+      });
       return;
     }
     openRoutineReview();
   }
   function openRoutineReview() {
+    routineSaveInProgress.current = false;
+    setRoutineFormNotice(null);
     setRoutineConfirmed(false);
     setPendingRoutineSheet("review");
     setModalOpen(false);
@@ -1404,6 +1417,7 @@ export default function App() {
     setWarningDays(String(dose.supply?.warningDays ?? 7));
     setSelectedMedication(null);
     setDeleteConfirming(false);
+    setRoutineFormNotice(null);
     setModalOpen(true);
   }
   function startAddingDose() {
@@ -1427,6 +1441,7 @@ export default function App() {
     setWarningDays("7");
     setSelectedMedication(null);
     setDeleteConfirming(false);
+    setRoutineFormNotice(null);
     setModalOpen(true);
   }
   function deleteEditingDose() {
@@ -1451,6 +1466,7 @@ export default function App() {
     if (remindersEnabled) setRemindersNeedRefresh(true);
   }
   async function enableReminders() {
+    if (reminderUpdateInProgress.current) return;
     if (demoMode) {
       Alert.alert(
         "Demo notifications stay off",
@@ -1458,68 +1474,99 @@ export default function App() {
       );
       return;
     }
-    let permissions = await Notifications.getPermissionsAsync();
-    if (!permissions.granted)
-      permissions = await Notifications.requestPermissionsAsync({
-        ios: { allowAlert: true, allowBadge: false, allowSound: true },
-      });
-    if (!permissions.granted) {
-      Alert.alert(
-        "Notifications are off",
-        "To receive reminders, allow notifications for Expo Go in your iPhone Settings.",
+    reminderUpdateInProgress.current = true;
+    try {
+      let permissions = await Notifications.getPermissionsAsync();
+      if (!permissions.granted)
+        permissions = await Notifications.requestPermissionsAsync({
+          ios: { allowAlert: true, allowBadge: false, allowSound: true },
+        });
+      if (!permissions.granted) {
+        Alert.alert(
+          "Notifications are off",
+          "To receive reminders, allow notifications for Expo Go in your iPhone Settings.",
+        );
+        return;
+      }
+      const scheduled = await scheduleReminders(
+        doses,
+        settings.hideNotificationDetails,
       );
-      return;
+      setRemindersEnabled(true);
+      setRemindersNeedRefresh(false);
+      Alert.alert(
+        "Daily reminders are on",
+        `${scheduled} reminder${scheduled === 1 ? "" : "s"} will appear at the scheduled times.`,
+      );
+    } catch {
+      Alert.alert(
+        "Could not refresh reminders",
+        "Your routine is still saved. Try Refresh again after reopening ClearCue.",
+      );
+    } finally {
+      reminderUpdateInProgress.current = false;
     }
-    const scheduled = await scheduleReminders(
-      doses,
-      settings.hideNotificationDetails,
-    );
-    setRemindersEnabled(true);
-    setRemindersNeedRefresh(false);
-    Alert.alert(
-      "Daily reminders are on",
-      `${scheduled} reminder${scheduled === 1 ? "" : "s"} will appear at the scheduled times.`,
-    );
   }
   async function toggleDemoMode(enabled: boolean) {
-    if (enabled) {
-      personalSnapshot.current = { doses, history, trackingStart };
-      personalReminders.current = remindersEnabled;
-      const demo = buildDemoRoutine();
-      await Notifications.cancelAllScheduledNotificationsAsync();
-      await AsyncStorage.setItem(DEMO_MODE_KEY, "active");
-      setDoses(demo.doses);
-      setHistory(demo.history);
-      setTrackingStart(demo.trackingStart);
-      setRemindersEnabled(false);
+    if (demoTransitionInProgress.current) return;
+    demoTransitionInProgress.current = true;
+    try {
+      if (enabled) {
+        personalSnapshot.current = { doses, history, trackingStart };
+        personalReminders.current = remindersEnabled;
+        const demo = buildDemoRoutine();
+        setDoses(demo.doses);
+        setHistory(demo.history);
+        setTrackingStart(demo.trackingStart);
+        setRemindersEnabled(false);
+        setRemindersNeedRefresh(false);
+        setDemoMode(true);
+        try {
+          await Promise.all([
+            Notifications.cancelAllScheduledNotificationsAsync(),
+            AsyncStorage.setItem(DEMO_MODE_KEY, "active"),
+          ]);
+        } catch {
+          // Demo content is already active; persistence and notification cleanup can retry next launch.
+        }
+        return;
+      }
+      const saved = personalSnapshot.current;
+      const [savedDoses, savedHistory, savedTracking] = saved
+        ? [null, null, null]
+        : await Promise.all([
+            AsyncStorage.getItem(STORAGE_KEY),
+            AsyncStorage.getItem(HISTORY_KEY),
+            AsyncStorage.getItem(TRACKING_START_KEY),
+          ]);
+      setDoses(
+        saved?.doses ??
+          (savedDoses ? (JSON.parse(savedDoses) as Dose[]) : STARTING_DOSES),
+      );
+      setHistory(
+        saved?.history ??
+          (savedHistory ? (JSON.parse(savedHistory) as DoseLog[]) : []),
+      );
+      setTrackingStart(
+        saved?.trackingStart ?? savedTracking ?? dateKey(new Date()),
+      );
+      setDemoMode(false);
+      setRemindersEnabled(personalReminders.current);
       setRemindersNeedRefresh(false);
-      setDemoMode(true);
-      return;
+      personalSnapshot.current = null;
+      try {
+        await AsyncStorage.removeItem(DEMO_MODE_KEY);
+      } catch {
+        // The restored personal routine remains usable even if the demo flag clears on the next launch.
+      }
+    } catch {
+      Alert.alert(
+        "Could not switch modes",
+        "Your current routine is still unchanged. Close and reopen ClearCue, then try again.",
+      );
+    } finally {
+      demoTransitionInProgress.current = false;
     }
-    const saved = personalSnapshot.current;
-    const [savedDoses, savedHistory, savedTracking] = saved
-      ? [null, null, null]
-      : await Promise.all([
-          AsyncStorage.getItem(STORAGE_KEY),
-          AsyncStorage.getItem(HISTORY_KEY),
-          AsyncStorage.getItem(TRACKING_START_KEY),
-        ]);
-    setDoses(
-      saved?.doses ??
-        (savedDoses ? (JSON.parse(savedDoses) as Dose[]) : STARTING_DOSES),
-    );
-    setHistory(
-      saved?.history ??
-        (savedHistory ? (JSON.parse(savedHistory) as DoseLog[]) : []),
-    );
-    setTrackingStart(
-      saved?.trackingStart ?? savedTracking ?? dateKey(new Date()),
-    );
-    setDemoMode(false);
-    await AsyncStorage.removeItem(DEMO_MODE_KEY);
-    setRemindersEnabled(personalReminders.current);
-    setRemindersNeedRefresh(false);
-    personalSnapshot.current = null;
   }
   function resetDemoMode() {
     if (!demoMode) return;
@@ -1527,6 +1574,22 @@ export default function App() {
     setDoses(demo.doses);
     setHistory(demo.history);
     setTrackingStart(demo.trackingStart);
+  }
+  function eraseRoutineData() {
+    void AsyncStorage.multiRemove([
+      STORAGE_KEY,
+      HISTORY_KEY,
+      TRACKING_START_KEY,
+    ]).catch(() => undefined);
+    void Notifications.cancelAllScheduledNotificationsAsync().catch(() =>
+      undefined,
+    );
+    setDoses([]);
+    setHistory([]);
+    setTrackingStart(dateKey(new Date()));
+    setRemindersEnabled(false);
+    setRemindersNeedRefresh(false);
+    setPrivacyOpen(false);
   }
   function openInsights() {
     setShowInsights(true);
@@ -1743,6 +1806,7 @@ export default function App() {
           openedOn={openedOn}
           warningDays={warningDays}
           deleteConfirming={deleteConfirming}
+          formNotice={routineFormNotice}
           selectedMedication={selectedMedication}
           onName={(value) => {
             setName(value);
@@ -1779,6 +1843,8 @@ export default function App() {
           onEye={setEye}
           onColor={setColor}
           onClose={() => setModalOpen(false)}
+          onDismissNotice={() => setRoutineFormNotice(null)}
+          onReviewNotice={openRoutineReview}
           onDismiss={() => {
             if (pendingRoutineSheet === "review") {
               setPendingRoutineSheet(null);
@@ -1810,12 +1876,15 @@ export default function App() {
           setRoutineReviewOpen(false);
         }}
         onDismiss={() => {
+          routineSaveInProgress.current = false;
           if (pendingRoutineSheet === "editor") {
             setPendingRoutineSheet(null);
             setModalOpen(true);
           }
         }}
         onSave={() => {
+          if (routineSaveInProgress.current) return;
+          routineSaveInProgress.current = true;
           setPendingRoutineSheet(null);
           setRoutineReviewOpen(false);
           persistDose();
@@ -1830,14 +1899,19 @@ export default function App() {
           openInsights();
         }}
         onPrivacy={() => {
+          setPendingCareSheet("privacy");
           setCareToolsOpen(false);
-          setPrivacyOpen(true);
         }}
         onSettings={() => {
+          setPendingCareSheet("settings");
           setCareToolsOpen(false);
-          setSettingsOpen(true);
         }}
         onClose={() => setCareToolsOpen(false)}
+        onDismiss={() => {
+          if (pendingCareSheet === "privacy") setPrivacyOpen(true);
+          if (pendingCareSheet === "settings") setSettingsOpen(true);
+          setPendingCareSheet(null);
+        }}
       />
       {launching && (
         <Animated.View
@@ -1882,32 +1956,7 @@ export default function App() {
             hideNotificationDetails: value,
           }))
         }
-        onErase={() => {
-          Alert.alert(
-            "Erase routine data?",
-            "This permanently removes medications, private prescription details, and adherence history from this device. Accessibility settings will stay.",
-            [
-              { text: "Cancel", style: "cancel" },
-              {
-                text: "Erase data",
-                style: "destructive",
-                onPress: () => {
-                  void AsyncStorage.multiRemove([
-                    STORAGE_KEY,
-                    HISTORY_KEY,
-                    TRACKING_START_KEY,
-                  ]);
-                  void Notifications.cancelAllScheduledNotificationsAsync();
-                  setDoses([]);
-                  setHistory([]);
-                  setTrackingStart(dateKey(new Date()));
-                  setRemindersEnabled(false);
-                  setPrivacyOpen(false);
-                },
-              },
-            ],
-          );
-        }}
+        onErase={eraseRoutineData}
         onClose={() => setPrivacyOpen(false)}
       />
       <SettingsModal
@@ -1916,14 +1965,20 @@ export default function App() {
         settings={settings}
         onChange={setSettings}
         onShowOnboarding={() => {
+          setShowOnboardingAfterSettings(true);
           setSettingsOpen(false);
-          setOnboardingStep(0);
-          setOnboardingVisible(true);
         }}
         demoMode={demoMode}
         onDemoMode={(enabled) => void toggleDemoMode(enabled)}
         onResetDemo={resetDemoMode}
         onClose={() => setSettingsOpen(false)}
+        onDismiss={() => {
+          if (showOnboardingAfterSettings) {
+            setShowOnboardingAfterSettings(false);
+            setOnboardingStep(0);
+            setOnboardingVisible(true);
+          }
+        }}
       />
       <DropGuideModal
         visible={guideOpen}
@@ -1992,6 +2047,7 @@ function CareToolsModal({
   onPrivacy,
   onSettings,
   onClose,
+  onDismiss,
 }: {
   visible: boolean;
   animation: "none" | "slide";
@@ -2000,6 +2056,7 @@ function CareToolsModal({
   onPrivacy: () => void;
   onSettings: () => void;
   onClose: () => void;
+  onDismiss: () => void;
 }) {
   const spanish = language === "es";
   return (
@@ -2008,6 +2065,7 @@ function CareToolsModal({
       animationType={animation}
       presentationStyle="pageSheet"
       onRequestClose={onClose}
+      onDismiss={onDismiss}
     >
       <SafeAreaView style={styles.modalScreen}>
         <View style={styles.modalHeader}>
@@ -3260,6 +3318,7 @@ function PrivacyModal({
   onErase: () => void;
   onClose: () => void;
 }) {
+  const [eraseConfirming, setEraseConfirming] = useState(false);
   return (
     <Modal
       visible={visible}
@@ -3311,16 +3370,43 @@ function PrivacyModal({
               dose history, and scheduled ClearCue notifications from this
               device. It cannot be undone.
             </Text>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Erase local ClearCue routine data"
-              onPress={onErase}
-              style={extraStyles.eraseButton}
-            >
-              <Text style={extraStyles.eraseButtonText}>
-                Erase my routine data
-              </Text>
-            </Pressable>
+            {eraseConfirming ? (
+              <View style={extraStyles.deleteConfirm}>
+                <Text style={extraStyles.eraseTitle}>Erase all routine data?</Text>
+                <Text style={extraStyles.eraseText}>
+                  This cannot be undone. Accessibility settings will stay on this device.
+                </Text>
+                <View style={styles.choiceRow}>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Keep local ClearCue routine data"
+                    onPress={() => setEraseConfirming(false)}
+                    style={styles.choice}
+                  >
+                    <Text style={styles.choiceText}>Keep data</Text>
+                  </Pressable>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Confirm erasing local ClearCue routine data"
+                    onPress={onErase}
+                    style={extraStyles.deleteConfirmButton}
+                  >
+                    <Text style={extraStyles.deleteConfirmButtonText}>Erase data</Text>
+                  </Pressable>
+                </View>
+              </View>
+            ) : (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Erase local ClearCue routine data"
+                onPress={() => setEraseConfirming(true)}
+                style={extraStyles.eraseButton}
+              >
+                <Text style={extraStyles.eraseButtonText}>
+                  Erase my routine data
+                </Text>
+              </Pressable>
+            )}
           </View>
         </ScrollView>
       </SafeAreaView>
@@ -3337,6 +3423,7 @@ function SettingsModal({
   onDemoMode,
   onResetDemo,
   onClose,
+  onDismiss,
 }: {
   visible: boolean;
   animation: "none" | "slide";
@@ -3347,6 +3434,7 @@ function SettingsModal({
   onDemoMode: (enabled: boolean) => void;
   onResetDemo: () => void;
   onClose: () => void;
+  onDismiss: () => void;
 }) {
   const update = (key: keyof Omit<AppSettings, "language">, value: boolean) =>
     onChange({ ...settings, [key]: value });
@@ -3356,6 +3444,7 @@ function SettingsModal({
       animationType={animation}
       presentationStyle="pageSheet"
       onRequestClose={onClose}
+      onDismiss={onDismiss}
     >
       <SafeAreaView style={styles.modalScreen}>
         <View style={styles.modalHeader}>
@@ -3712,6 +3801,7 @@ type ModalProps = {
   openedOn: string;
   warningDays: string;
   deleteConfirming: boolean;
+  formNotice: { title: string; message: string; allowReview?: boolean } | null;
   selectedMedication: CatalogMedication | null;
   onName: (v: string) => void;
   onSelectMedication: (medication: CatalogMedication) => void;
@@ -3732,6 +3822,8 @@ type ModalProps = {
   onEye: (v: Eye) => void;
   onColor: (v: string) => void;
   onClose: () => void;
+  onDismissNotice: () => void;
+  onReviewNotice: () => void;
   onDismiss: () => void;
   onSave: () => void;
   onDelete: () => void;
@@ -4217,6 +4309,32 @@ function AddMedicationModal(props: ModalProps) {
               see on your bottle and follow your clinician’s instructions.
             </Text>
           </View>
+          {props.formNotice && (
+            <View style={extraStyles.deleteConfirm}>
+              <Text style={extraStyles.eraseTitle}>{props.formNotice.title}</Text>
+              <Text style={extraStyles.eraseText}>{props.formNotice.message}</Text>
+              <View style={styles.choiceRow}>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Dismiss routine form message"
+                  onPress={props.onDismissNotice}
+                  style={styles.choice}
+                >
+                  <Text style={styles.choiceText}>Keep editing</Text>
+                </Pressable>
+                {props.formNotice.allowReview && (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Review routine despite close reminder times"
+                    onPress={props.onReviewNotice}
+                    style={extraStyles.deleteConfirmButton}
+                  >
+                    <Text style={extraStyles.deleteConfirmButtonText}>Review routine</Text>
+                  </Pressable>
+                )}
+              </View>
+            </View>
+          )}
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Save medication"

@@ -26,6 +26,12 @@ Local reminder actions and full notification behavior should be tested in an iOS
 
 ## Version history
 
+### v1.21.0 — Normal-mode interruption audit
+
+- Made Demo Mode switch to its visible routine immediately and isolated notification and storage cleanup from the interaction; duplicate mode and reminder operations are ignored while one is already in progress.
+- Replaced routine-validation and data-erasure system alerts with in-sheet confirmations, preventing alert-over-sheet interruptions.
+- Extended dismissal-based sheet sequencing to Care Tools, Privacy, Accessibility settings, and the welcome guide.
+
 ### v1.20.0 — Deterministic sheet sequencing
 
 - Made the edit-to-review and review-to-edit transitions wait for iOS to finish dismissing the prior sheet before presenting the next one, replacing the previous timing-based handoff.

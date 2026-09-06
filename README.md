@@ -26,6 +26,11 @@ Local reminder actions and full notification behavior should be tested in an iOS
 
 ## Version history
 
+### v1.24.0 — Calmer welcome behavior
+
+- Full welcome onboarding now appears only on a first launch, after an intentional erase-all-data action, or when chosen manually from Settings.
+- Deleting the last medication now stays on the lightweight empty state instead of reopening onboarding.
+
 ### v1.23.0 — Clearer multi-time routines and Spanish core flow
 
 - Grouped every daily time for the same medication into one home card while retaining separate history and Taken actions for each scheduled time.

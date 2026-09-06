@@ -1002,10 +1002,11 @@ export default function App() {
   const [guideOpen, setGuideOpen] = useState(false);
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [onboardingVisible, setOnboardingVisible] = useState(false);
+  const [showOnboardingAfterPrivacy, setShowOnboardingAfterPrivacy] =
+    useState(false);
   const [onboardingStep, setOnboardingStep] = useState(0);
   const [launching, setLaunching] = useState(true);
   const splashOpacity = useRef(new Animated.Value(1)).current;
-  const sawEmptyRoutine = useRef(false);
   useEffect(() => {
     const timer = setTimeout(
       () =>
@@ -1093,15 +1094,6 @@ export default function App() {
         () => undefined,
       );
   }, [doses, hydrated, demoMode]);
-  useEffect(() => {
-    if (!hydrated || demoMode) return;
-    if (doses.length === 0 && !sawEmptyRoutine.current) {
-      sawEmptyRoutine.current = true;
-      setOnboardingStep(0);
-      setOnboardingVisible(true);
-    }
-    if (doses.length > 0) sawEmptyRoutine.current = false;
-  }, [doses.length, hydrated, demoMode]);
   useEffect(() => {
     if (hydrated && !demoMode)
       void AsyncStorage.setItem(HISTORY_KEY, JSON.stringify(history)).catch(
@@ -1628,6 +1620,7 @@ export default function App() {
       STORAGE_KEY,
       HISTORY_KEY,
       TRACKING_START_KEY,
+      ONBOARDING_KEY,
     ]).catch(() => undefined);
     void Notifications.cancelAllScheduledNotificationsAsync().catch(() =>
       undefined,
@@ -1637,6 +1630,7 @@ export default function App() {
     setTrackingStart(dateKey(new Date()));
     setRemindersEnabled(false);
     setRemindersNeedRefresh(false);
+    setShowOnboardingAfterPrivacy(true);
     setPrivacyOpen(false);
   }
   function openInsights() {
@@ -2008,6 +2002,13 @@ export default function App() {
         }
         onErase={eraseRoutineData}
         onClose={() => setPrivacyOpen(false)}
+        onDismiss={() => {
+          if (showOnboardingAfterPrivacy) {
+            setShowOnboardingAfterPrivacy(false);
+            setOnboardingStep(0);
+            setOnboardingVisible(true);
+          }
+        }}
       />
       <SettingsModal
         visible={settingsOpen}
@@ -3389,6 +3390,7 @@ function PrivacyModal({
   onHideNotificationDetails,
   onErase,
   onClose,
+  onDismiss,
 }: {
   visible: boolean;
   animation: "none" | "slide";
@@ -3396,6 +3398,7 @@ function PrivacyModal({
   onHideNotificationDetails: (value: boolean) => void;
   onErase: () => void;
   onClose: () => void;
+  onDismiss: () => void;
 }) {
   const [eraseConfirming, setEraseConfirming] = useState(false);
   return (
@@ -3404,6 +3407,7 @@ function PrivacyModal({
       animationType={animation}
       presentationStyle="pageSheet"
       onRequestClose={onClose}
+      onDismiss={onDismiss}
     >
       <SafeAreaView style={styles.modalScreen}>
         <View style={styles.modalHeader}>

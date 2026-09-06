@@ -938,6 +938,9 @@ export default function App() {
   const [trackingStart, setTrackingStart] = useState(dateKey(new Date()));
   const [reportOpen, setReportOpen] = useState(false);
   const [routineReviewOpen, setRoutineReviewOpen] = useState(false);
+  const [pendingRoutineSheet, setPendingRoutineSheet] = useState<
+    "review" | "editor" | null
+  >(null);
   const [routineConfirmed, setRoutineConfirmed] = useState(false);
   const [deleteConfirming, setDeleteConfirming] = useState(false);
   const [careToolsOpen, setCareToolsOpen] = useState(false);
@@ -1268,8 +1271,8 @@ export default function App() {
   }
   function openRoutineReview() {
     setRoutineConfirmed(false);
+    setPendingRoutineSheet("review");
     setModalOpen(false);
-    setRoutineReviewOpen(true);
   }
   function persistDose() {
     const supply = bottleMl
@@ -1776,6 +1779,12 @@ export default function App() {
           onEye={setEye}
           onColor={setColor}
           onClose={() => setModalOpen(false)}
+          onDismiss={() => {
+            if (pendingRoutineSheet === "review") {
+              setPendingRoutineSheet(null);
+              setRoutineReviewOpen(true);
+            }
+          }}
           onSave={saveDose}
           onDelete={deleteEditingDose}
           onCancelDelete={() => setDeleteConfirming(false)}
@@ -1797,10 +1806,17 @@ export default function App() {
         confirmed={routineConfirmed}
         onConfirmed={setRoutineConfirmed}
         onBack={() => {
+          setPendingRoutineSheet("editor");
           setRoutineReviewOpen(false);
-          setTimeout(() => setModalOpen(true), 250);
+        }}
+        onDismiss={() => {
+          if (pendingRoutineSheet === "editor") {
+            setPendingRoutineSheet(null);
+            setModalOpen(true);
+          }
         }}
         onSave={() => {
+          setPendingRoutineSheet(null);
           setRoutineReviewOpen(false);
           persistDose();
         }}
@@ -3716,12 +3732,13 @@ type ModalProps = {
   onEye: (v: Eye) => void;
   onColor: (v: string) => void;
   onClose: () => void;
+  onDismiss: () => void;
   onSave: () => void;
   onDelete: () => void;
   onCancelDelete: () => void;
   onConfirmDelete: () => void;
 };
-function RoutineReviewModal({ visible, animation, name, eye, times, clinicianInstructions, bottleMl, dropsPerApplication, applicationsPerDay, openedOn, warningDays, confirmed, onConfirmed, onBack, onSave }: { visible: boolean; animation: "none" | "slide"; name: string; eye: Eye; times: string[]; clinicianInstructions: string; bottleMl: string; dropsPerApplication: string; applicationsPerDay: string; openedOn: string; warningDays: string; confirmed: boolean; onConfirmed: (value: boolean) => void; onBack: () => void; onSave: () => void }) {
+function RoutineReviewModal({ visible, animation, name, eye, times, clinicianInstructions, bottleMl, dropsPerApplication, applicationsPerDay, openedOn, warningDays, confirmed, onConfirmed, onBack, onDismiss, onSave }: { visible: boolean; animation: "none" | "slide"; name: string; eye: Eye; times: string[]; clinicianInstructions: string; bottleMl: string; dropsPerApplication: string; applicationsPerDay: string; openedOn: string; warningDays: string; confirmed: boolean; onConfirmed: (value: boolean) => void; onBack: () => void; onDismiss: () => void; onSave: () => void }) {
   const warnings: string[] = [];
   if (bottleMl && Number(applicationsPerDay) !== times.length) warnings.push(`This routine has ${times.length} reminder${times.length === 1 ? "" : "s"}, while the supply estimate says ${applicationsPerDay} use${Number(applicationsPerDay) === 1 ? "" : "s"} per day. Confirm both against the prescription label.`);
   if (bottleMl && isValidIsoDate(openedOn)) {
@@ -3730,7 +3747,7 @@ function RoutineReviewModal({ visible, animation, name, eye, times, clinicianIns
     if (opened.getTime() > Date.now()) warnings.push("The bottle-opened date is in the future. This can be valid for a planned routine, but confirm it before saving.");
     else if (ageInDays > 365) warnings.push("The bottle-opened date is more than a year ago. Confirm that it is still the correct bottle and date.");
   }
-  return <Modal visible={visible} animationType={animation} presentationStyle="pageSheet" onRequestClose={onBack}><SafeAreaView style={styles.modalScreen}><View style={styles.modalHeader}><View><Text style={styles.sectionLabel}>REVIEW ROUTINE</Text><Text style={styles.modalTitle}>Check before saving</Text></View><Pressable accessibilityRole="button" accessibilityLabel="Return to routine editing" onPress={onBack} style={styles.close}><Text style={styles.closeText}>×</Text></Pressable></View><ScrollView contentContainerStyle={styles.form}><View style={styles.note}><Text style={styles.noteTitle}>ClearCue supports your plan</Text><Text style={styles.noteText}>ClearCue does not diagnose, prescribe, validate a clinical treatment plan, or replace your clinician’s instructions or prescription label.</Text></View><View style={extraStyles.detailsSection}><Text style={styles.fieldLabel}>{name}</Text><Text style={extraStyles.supplyHelp}>{eye} · {times.join(" · ")}</Text>{clinicianInstructions ? <Text style={extraStyles.supplyHelp}>Clinician instructions: {clinicianInstructions}</Text> : null}{bottleMl ? <Text style={extraStyles.supplyHelp}>Supply estimate: {bottleMl} mL · {dropsPerApplication} drop{Number(dropsPerApplication) === 1 ? "" : "s"} each use · {applicationsPerDay} use{Number(applicationsPerDay) === 1 ? "" : "s"} daily · opened {openedOn} · warning {warningDays} days before estimate</Text> : <Text style={extraStyles.supplyHelp}>No supply estimate added.</Text>}</View>{warnings.map((warning) => <View key={warning} style={extraStyles.eraseSection}><Text style={extraStyles.eraseTitle}>Review this detail</Text><Text style={extraStyles.eraseText}>{warning}</Text></View>)}<Pressable accessibilityRole="checkbox" accessibilityState={{ checked: confirmed }} accessibilityLabel="I checked these values against my clinician's prescription" onPress={() => onConfirmed(!confirmed)} style={[styles.choice, confirmed && styles.choiceSelected]}><Text style={[styles.choiceText, confirmed && styles.choiceTextSelected]}>{confirmed ? "✓ " : ""}I checked these values against my clinician’s prescription.</Text></Pressable><Pressable accessibilityRole="button" accessibilityState={{ disabled: !confirmed }} accessibilityLabel="Save reviewed eye drop routine" disabled={!confirmed} onPress={onSave} style={[styles.saveButton, !confirmed && { opacity: 0.45 }]}><Text style={styles.saveText}>Save routine</Text></Pressable><Pressable accessibilityRole="button" accessibilityLabel="Return to routine editing" onPress={onBack} style={extraStyles.emptyGuide}><Text style={extraStyles.cardLink}>Go back and edit</Text></Pressable></ScrollView></SafeAreaView></Modal>;
+  return <Modal visible={visible} animationType={animation} presentationStyle="pageSheet" onRequestClose={onBack} onDismiss={onDismiss}><SafeAreaView style={styles.modalScreen}><View style={styles.modalHeader}><View><Text style={styles.sectionLabel}>REVIEW ROUTINE</Text><Text style={styles.modalTitle}>Check before saving</Text></View><Pressable accessibilityRole="button" accessibilityLabel="Return to routine editing" onPress={onBack} style={styles.close}><Text style={styles.closeText}>×</Text></Pressable></View><ScrollView contentContainerStyle={styles.form}><View style={styles.note}><Text style={styles.noteTitle}>ClearCue supports your plan</Text><Text style={styles.noteText}>ClearCue does not diagnose, prescribe, validate a clinical treatment plan, or replace your clinician’s instructions or prescription label.</Text></View><View style={extraStyles.detailsSection}><Text style={styles.fieldLabel}>{name}</Text><Text style={extraStyles.supplyHelp}>{eye} · {times.join(" · ")}</Text>{clinicianInstructions ? <Text style={extraStyles.supplyHelp}>Clinician instructions: {clinicianInstructions}</Text> : null}{bottleMl ? <Text style={extraStyles.supplyHelp}>Supply estimate: {bottleMl} mL · {dropsPerApplication} drop{Number(dropsPerApplication) === 1 ? "" : "s"} each use · {applicationsPerDay} use{Number(applicationsPerDay) === 1 ? "" : "s"} daily · opened {openedOn} · warning {warningDays} days before estimate</Text> : <Text style={extraStyles.supplyHelp}>No supply estimate added.</Text>}</View>{warnings.map((warning) => <View key={warning} style={extraStyles.eraseSection}><Text style={extraStyles.eraseTitle}>Review this detail</Text><Text style={extraStyles.eraseText}>{warning}</Text></View>)}<Pressable accessibilityRole="checkbox" accessibilityState={{ checked: confirmed }} accessibilityLabel="I checked these values against my clinician's prescription" onPress={() => onConfirmed(!confirmed)} style={[styles.choice, confirmed && styles.choiceSelected]}><Text style={[styles.choiceText, confirmed && styles.choiceTextSelected]}>{confirmed ? "✓ " : ""}I checked these values against my clinician’s prescription.</Text></Pressable><Pressable accessibilityRole="button" accessibilityState={{ disabled: !confirmed }} accessibilityLabel="Save reviewed eye drop routine" disabled={!confirmed} onPress={onSave} style={[styles.saveButton, !confirmed && { opacity: 0.45 }]}><Text style={styles.saveText}>Save routine</Text></Pressable><Pressable accessibilityRole="button" accessibilityLabel="Return to routine editing" onPress={onBack} style={extraStyles.emptyGuide}><Text style={extraStyles.cardLink}>Go back and edit</Text></Pressable></ScrollView></SafeAreaView></Modal>;
 }
 function AddMedicationModal(props: ModalProps) {
   const [medicationFilter, setMedicationFilter] =
@@ -3746,6 +3763,7 @@ function AddMedicationModal(props: ModalProps) {
       animationType={props.animation}
       presentationStyle="pageSheet"
       onRequestClose={props.onClose}
+      onDismiss={props.onDismiss}
     >
       <SafeAreaView style={styles.modalScreen}>
         <View style={styles.modalHeader}>

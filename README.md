@@ -26,6 +26,11 @@ Local reminder actions and full notification behavior should be tested in an iOS
 
 ## Version history
 
+### v1.20.0 — Deterministic sheet sequencing
+
+- Made the edit-to-review and review-to-edit transitions wait for iOS to finish dismissing the prior sheet before presenting the next one, replacing the previous timing-based handoff.
+- This removes the remaining sheet-presentation race that could leave the interface unresponsive after saving or returning to an edit, especially in Demo Mode.
+
 ### v1.19.0 — Native sheet reliability
 
 - Prevented the review sheet from being presented over the still-open edit sheet on iOS; routine review now follows a clean sheet transition.

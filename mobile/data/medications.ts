@@ -13,7 +13,7 @@ export type CatalogMedication = {
 
 export const MEDICATION_FILTERS = [
   'All',
-  'Eye pressure',
+  'Glaucoma',
   'Dry eye & lubricants',
   'Allergy',
   'Infection',
@@ -95,7 +95,7 @@ export function searchMedications(query: string, filter: MedicationFilter = 'All
   const normalized = query.trim().toLowerCase();
   const filterTerms: Record<MedicationFilter, string[]> = {
     All: [],
-    'Eye pressure': ['pressure', 'prostaglandin', 'beta blocker', 'carbonic', 'alpha agonist', 'rho kinase', 'miotic', 'combination pressure'],
+    Glaucoma: ['pressure', 'prostaglandin', 'beta blocker', 'carbonic', 'alpha agonist', 'rho kinase', 'miotic', 'combination pressure'],
     'Dry eye & lubricants': ['dry-eye', 'lubricant', 'immunomodulator', 'lfa-1', 'semifluorinated'],
     Allergy: ['allergy', 'antihistamine', 'mast cell'],
     Infection: ['antibiotic'],

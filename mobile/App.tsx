@@ -879,7 +879,7 @@ function localizedMedicationFilter(filter: MedicationFilter, language: "en" | "e
   if (language === "en") return filter;
   return ({
     All: "Todos",
-    "Eye pressure": "Presión ocular",
+    Glaucoma: "Glaucoma",
     "Dry eye & lubricants": "Ojo seco y lubricantes",
     Allergy: "Alergia",
     Infection: "Infección",

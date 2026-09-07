@@ -32,6 +32,8 @@ The current ClearCue app is the Expo project in [`mobile/`](mobile). It is the o
 
 ### Current release — v1.26
 
+- Today’s timeline marks each scheduled dose as upcoming, due now, completed, late, or skipped. A late dose shows non-directive label/clinician safety guidance and record-only actions.
+- A reminder checkup confirms notification permission, the next planned reminder, and whether scheduled reminders need attention.
 - One clear home card per medication, even when it has several daily times; each time keeps its own completion and history actions.
 - Medication browsing stays stable after a selection, and both search results and selected-medication details can expand or collapse without hiding the rest of the routine form.
 - Bottle-label color is optional; add/edit menus use slightly larger text throughout, with additional scaling for expanded time and calendar controls when Large text is on.

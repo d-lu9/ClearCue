@@ -58,12 +58,17 @@ type Dose = {
   supply?: Supply;
   prescription?: PrescriptionDetails;
 };
-type AdherenceStatus = "taken" | "late" | "missed";
+type AdherenceStatus = "taken" | "late" | "missed" | "skipped";
 type DoseLog = {
   doseId: string;
   date: string;
   status: AdherenceStatus;
   completedAt?: string;
+};
+type ReminderCheckup = {
+  tone: "ready" | "attention";
+  message: string;
+  next: string | null;
 };
 type AppSettings = {
   largeText: boolean;
@@ -590,6 +595,25 @@ const extraStyles = StyleSheet.create({
   },
   statusComplete: { color: "#557A66", backgroundColor: "#E7F0E9" },
   statusDue: { color: "#9B6B3D", backgroundColor: "#F5E5D8" },
+  statusLate: { color: "#A33C34", backgroundColor: "#FBE7E4" },
+  missedDoseSafety: {
+    backgroundColor: "#FFF7E9",
+    borderRadius: 10,
+    padding: 11,
+    gap: 9,
+  },
+  missedDoseSafetyText: { color: "#704D30", fontSize: 13, lineHeight: 18 },
+  missedDoseActions: { flexDirection: "row", gap: 8 },
+  reminderCheckup: { marginTop: -8 },
+  reminderCheckupResult: {
+    backgroundColor: "#E7F0E9",
+    borderRadius: 12,
+    padding: 12,
+    gap: 4,
+  },
+  reminderCheckupAttention: { backgroundColor: "#FFF7E9" },
+  reminderCheckupText: { color: "#3A302B", fontSize: 13, lineHeight: 18 },
+  reminderCheckupNext: { color: "#557A66", fontSize: 13, fontWeight: "800" },
   medicationFooter: {
     marginTop: 13,
     paddingTop: 11,
@@ -785,6 +809,17 @@ function scheduledDate(date: string, time: string) {
   return clock
     ? new Date(year, month - 1, day, clock.hour, clock.minute)
     : null;
+}
+type TodayDoseState = "upcoming" | "due" | "completed" | "late" | "skipped";
+function todayDoseState(dose: Dose, history: DoseLog[]): TodayDoseState {
+  const today = dateKey(new Date());
+  const logged = history.find((item) => item.doseId === dose.id && item.date === today);
+  if (logged?.status === "skipped") return "skipped";
+  if (logged?.status === "taken" || logged?.status === "late") return "completed";
+  const due = scheduledDate(today, dose.time);
+  if (!due || due.getTime() > Date.now()) return "upcoming";
+  if (Date.now() <= due.getTime() + 30 * 60_000) return "due";
+  return "late";
 }
 function timePeriod(time: string) {
   const clock = parseReminderTime(time);
@@ -990,6 +1025,7 @@ export default function App() {
   const personalReminders = useRef(false);
   const [remindersEnabled, setRemindersEnabled] = useState(false);
   const [remindersNeedRefresh, setRemindersNeedRefresh] = useState(false);
+  const [reminderCheckup, setReminderCheckup] = useState<ReminderCheckup | null>(null);
   const [history, setHistory] = useState<DoseLog[]>([]);
   const [showInsights, setShowInsights] = useState(false);
   const homeScrollRef = useRef<ScrollView>(null);
@@ -1176,7 +1212,7 @@ export default function App() {
         const doseId = response.notification.request.content.data?.doseId;
         if (typeof doseId !== "string" || demoMode) return;
         if (response.actionIdentifier === "TAKEN") recordDose(doseId, "taken");
-        if (response.actionIdentifier === "SKIP") recordDose(doseId, "missed");
+        if (response.actionIdentifier === "SKIP") recordDose(doseId, "skipped");
         if (response.actionIdentifier === "SNOOZE")
           void Notifications.scheduleNotificationAsync({
             content: {
@@ -1236,7 +1272,9 @@ export default function App() {
         : requestedStatus;
     setDoses((current) =>
       current.map((item) =>
-        item.id === id ? { ...item, completed: status !== "missed" } : item,
+        item.id === id
+          ? { ...item, completed: status !== "missed" && status !== "skipped" }
+          : item,
       ),
     );
     setHistory((current) => [
@@ -1245,7 +1283,10 @@ export default function App() {
         doseId: id,
         date: today,
         status,
-        completedAt: status === "missed" ? undefined : new Date().toISOString(),
+        completedAt:
+          status === "missed" || status === "skipped"
+            ? undefined
+            : new Date().toISOString(),
       },
     ]);
   }
@@ -1547,6 +1588,7 @@ export default function App() {
       );
       setRemindersEnabled(true);
       setRemindersNeedRefresh(false);
+      void checkReminders();
       Alert.alert(
         "Daily reminders are on",
         `${scheduled} reminder${scheduled === 1 ? "" : "s"} will appear at the scheduled times.`,
@@ -1558,6 +1600,74 @@ export default function App() {
       );
     } finally {
       reminderUpdateInProgress.current = false;
+    }
+  }
+  async function checkReminders() {
+    if (demoMode) {
+      setReminderCheckup({
+        tone: "attention",
+        message:
+          settings.language === "es"
+            ? "El modo demo no programa notificaciones reales."
+            : "Demo Mode does not schedule real notifications.",
+        next: null,
+      });
+      return;
+    }
+    try {
+      const permissions = await Notifications.getPermissionsAsync();
+      const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+      const now = new Date();
+      const nextDose = doses
+        .map((dose) => ({ dose, clock: parseReminderTime(dose.time) }))
+        .filter((item): item is { dose: Dose; clock: { hour: number; minute: number } } => item.clock !== null)
+        .map(({ dose, clock }) => {
+          const next = new Date();
+          next.setHours(clock.hour, clock.minute, 0, 0);
+          if (next.getTime() <= now.getTime()) next.setDate(next.getDate() + 1);
+          return { dose, next };
+        })
+        .sort((a, b) => a.next.getTime() - b.next.getTime())[0];
+      const next = nextDose
+        ? `${nextDose.dose.name} · ${nextDose.dose.time}`
+        : null;
+      if (!permissions.granted) {
+        setReminderCheckup({
+          tone: "attention",
+          message:
+            settings.language === "es"
+              ? "Las notificaciones están desactivadas en el teléfono. Actívalas para ClearCue en Configuración."
+              : "Notifications are off on this phone. Enable them for ClearCue in Settings.",
+          next,
+        });
+      } else if (!scheduled.length || remindersNeedRefresh) {
+        setReminderCheckup({
+          tone: "attention",
+          message:
+            settings.language === "es"
+              ? "Tus recordatorios necesitan actualizarse. Toca Actualizar para programarlos de nuevo."
+              : "Your reminders need an update. Tap Refresh to schedule them again.",
+          next,
+        });
+      } else {
+        setReminderCheckup({
+          tone: "ready",
+          message:
+            settings.language === "es"
+              ? "Las notificaciones están permitidas y ClearCue tiene recordatorios programados."
+              : "Notifications are allowed and ClearCue has scheduled reminders.",
+          next,
+        });
+      }
+    } catch {
+      setReminderCheckup({
+        tone: "attention",
+        message:
+          settings.language === "es"
+            ? "No se pudo revisar los recordatorios. Inténtalo de nuevo después de abrir ClearCue."
+            : "Could not check reminders. Try again after reopening ClearCue.",
+        next: null,
+      });
     }
   }
   async function toggleDemoMode(enabled: boolean) {
@@ -1713,6 +1823,34 @@ export default function App() {
               </View>
             </View>
           </View>
+          <View style={extraStyles.reminderCheckup}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={settings.language === "es" ? "Revisar confiabilidad de recordatorios" : "Check reminder reliability"}
+              onPress={() => void checkReminders()}
+              style={extraStyles.emptyGuide}
+            >
+              <Text style={extraStyles.cardLink}>
+                {settings.language === "es" ? "Revisar recordatorios" : "Check reminders"}
+              </Text>
+            </Pressable>
+            {reminderCheckup && (
+              <View
+                style={[
+                  extraStyles.reminderCheckupResult,
+                  reminderCheckup.tone === "attention" && extraStyles.reminderCheckupAttention,
+                ]}
+              >
+                <Text style={extraStyles.reminderCheckupText}>{reminderCheckup.message}</Text>
+                {reminderCheckup.next && (
+                  <Text style={extraStyles.reminderCheckupNext}>
+                    {settings.language === "es" ? "Próximo: " : "Next: "}
+                    {reminderCheckup.next}
+                  </Text>
+                )}
+              </View>
+            )}
+          </View>
           <View style={extraStyles.quickTools}>
             <HomeAction
               label={
@@ -1744,7 +1882,9 @@ export default function App() {
                   doses={group.doses}
                   language={settings.language}
                   largeText={settings.largeText}
+                  history={history}
                   onToggle={toggleDose}
+                  onSkip={(id) => recordDose(id, "skipped")}
                   onEdit={() => editDose(group.doses[0])}
                   onHistory={setHistoryDoseId}
                 />
@@ -2237,14 +2377,18 @@ function DoseCard({
   doses,
   language,
   largeText,
+  history,
   onToggle,
+  onSkip,
   onEdit,
   onHistory,
 }: {
   doses: Dose[];
   language: "en" | "es";
   largeText: boolean;
+  history: DoseLog[];
   onToggle: (id: string) => void;
+  onSkip: (id: string) => void;
   onEdit: () => void;
   onHistory: (id: string) => void;
 }) {
@@ -2301,13 +2445,27 @@ function DoseCard({
         )}
         <View style={extraStyles.groupedTimes}>
           {doses.map((scheduledDose) => {
-            const status = scheduledDose.completed
-              ? language === "es"
-                ? "Completado"
-                : "Completed"
-              : language === "es"
-                ? "Pendiente"
-                : "Due today";
+            const state = todayDoseState(scheduledDose, history);
+            const status =
+              state === "completed"
+                ? language === "es"
+                  ? "Completada"
+                  : "Completed"
+                : state === "skipped"
+                  ? language === "es"
+                    ? "Omitida"
+                    : "Skipped"
+                  : state === "late"
+                    ? language === "es"
+                      ? "Atrasada"
+                      : "Late"
+                    : state === "due"
+                      ? language === "es"
+                        ? "Ahora"
+                        : "Due now"
+                      : language === "es"
+                        ? "Próxima"
+                        : "Upcoming";
             return (
               <View key={scheduledDose.id} style={extraStyles.groupedTimeRow}>
                 <View style={extraStyles.timeBlock}>
@@ -2317,9 +2475,11 @@ function DoseCard({
                   <Text
                     style={[
                       extraStyles.statusBadge,
-                      scheduledDose.completed
+                      state === "completed"
                         ? extraStyles.statusComplete
-                        : extraStyles.statusDue,
+                        : state === "late" || state === "skipped"
+                          ? extraStyles.statusLate
+                          : extraStyles.statusDue,
                     ]}
                   >
                     {status}
@@ -2337,13 +2497,13 @@ function DoseCard({
                   </Pressable>
                   <Pressable
                     accessibilityRole="button"
-                    accessibilityLabel={`${scheduledDose.completed ? "Mark incomplete" : "Mark as taken"}: ${dose.name} at ${scheduledDose.time}`}
+                    accessibilityLabel={`${state === "completed" ? "Mark incomplete" : "Mark as taken"}: ${dose.name} at ${scheduledDose.time}`}
                     accessibilityHint="Records this dose in adherence history"
                     onPress={() => onToggle(scheduledDose.id)}
-                    style={[styles.doneButton, scheduledDose.completed && styles.checkedButton]}
+                    style={[styles.doneButton, state === "completed" && styles.checkedButton]}
                   >
                     <Text style={styles.doneText}>
-                      {scheduledDose.completed
+                      {state === "completed"
                         ? language === "es"
                           ? "✓ Tomada"
                           : "✓ Taken"
@@ -2353,6 +2513,33 @@ function DoseCard({
                     </Text>
                   </Pressable>
                 </View>
+                {state === "late" && (
+                  <View style={extraStyles.missedDoseSafety}>
+                    <Text style={extraStyles.missedDoseSafetyText}>
+                      {language === "es"
+                        ? "Sigue la etiqueta de tu receta o las instrucciones de tu profesional. No dupliques una dosis a menos que te lo indiquen."
+                        : "Follow your prescription label or clinician’s instructions. Do not double-dose unless instructed."}
+                    </Text>
+                    <View style={extraStyles.missedDoseActions}>
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel={language === "es" ? "Registrar como omitida" : "Record as skipped"}
+                        onPress={() => onSkip(scheduledDose.id)}
+                        style={styles.choice}
+                      >
+                        <Text style={styles.choiceText}>{language === "es" ? "Omitida" : "Skipped"}</Text>
+                      </Pressable>
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel={language === "es" ? "Registrar como tomada más tarde" : "Record as taken later"}
+                        onPress={() => onToggle(scheduledDose.id)}
+                        style={styles.doneButton}
+                      >
+                        <Text style={styles.doneText}>{language === "es" ? "Tomada más tarde" : "Taken later"}</Text>
+                      </Pressable>
+                    </View>
+                  </View>
+                )}
               </View>
             );
           })}
@@ -2425,13 +2612,17 @@ function buildAdherence(
   const statuses = days.flatMap((day) => day.statuses);
   const taken = statuses.filter((status) => status === "taken").length;
   const late = statuses.filter((status) => status === "late").length;
-  const missed = statuses.filter((status) => status === "missed").length;
+  const missed = statuses.filter(
+    (status) => status === "missed" || status === "skipped",
+  ).length;
   const expected = statuses.length;
   let streak = 0;
   for (const day of [...days].reverse()) {
     if (
       day.statuses.length === doses.length &&
-      day.statuses.every((status) => status !== "missed")
+      day.statuses.every(
+        (status) => status !== "missed" && status !== "skipped",
+      )
     )
       streak++;
     else if (day.statuses.length === doses.length) break;
@@ -2452,7 +2643,7 @@ function buildAdherence(
         doseStatuses.push("missed");
     });
     const doseTaken = doseStatuses.filter(
-      (status) => status !== "missed",
+      (status) => status === "taken" || status === "late",
     ).length;
     return {
       name: dose.name,
@@ -2818,6 +3009,8 @@ function DoseHistoryModal({
       ? "On time"
       : status === "late"
         ? "Late"
+        : status === "skipped"
+          ? "Skipped"
         : status === "missed"
           ? "Missed"
           : status === "upcoming"

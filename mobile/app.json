@@ -2,7 +2,7 @@
   "expo": {
     "name": "ClearCue",
     "slug": "clearcue",
-    "version": "1.7.0",
+    "version": "1.26.0",
     "orientation": "portrait",
     "icon": "./assets/clearcue-icon.png",
     "splash": {

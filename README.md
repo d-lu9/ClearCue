@@ -10,7 +10,7 @@ The native mobile project is in [`mobile/`](mobile).
 2. In a terminal, run `cd mobile` followed by `npm start`.
 3. Scan the QR code with the iPhone camera and open it in Expo Go.
 
-Local reminder actions and full notification behavior should be tested in an iOS development build before release; Expo Go has notification limitations.
+Expo Go is useful for prototype work, but real reminder behavior must be validated in a standalone iPhone development or TestFlight build before release.
 
 ## Current app source
 
@@ -30,7 +30,7 @@ The current ClearCue app is the Expo project in [`mobile/`](mobile). It is the o
 
 ## Release highlights
 
-### Current release — v1.26
+### Current release — v1.26.0
 
 - Today’s timeline marks each scheduled dose as upcoming, due now, completed, late, or skipped. A late dose shows non-directive label/clinician safety guidance and record-only actions.
 - A reminder checkup confirms notification permission, the next planned reminder, and whether scheduled reminders need attention.
@@ -63,3 +63,14 @@ Catalog changes are reviewed and shipped in app releases rather than downloaded 
 ## Next milestone
 
 - Establish a recurring review process for the bundled medication catalog and continue improving the focused eye-drop routine experience.
+- Evaluate optional device passcode or Face ID protection in a future TestFlight build if private prescription numbers or clinician details return.
+
+## Before TestFlight or release
+
+Test on a physical iPhone in a standalone ClearCue build—not Expo Go:
+
+- Grant, deny, then re-grant notification permission; confirm the reminder checkup reports the correct state and next reminder.
+- Confirm a scheduled reminder appears while the app is backgrounded, and that its Taken and Skip actions update today’s timeline and history correctly.
+- Leave a routine scheduled across midnight, then confirm the new day’s timeline and completion state are correct.
+
+The source type-checks successfully. A full iOS bundle still needs a macOS/iOS build environment: the current Windows environment cannot run Expo’s Hermes compiler, which is an environment permission limitation rather than an identified ClearCue build failure.

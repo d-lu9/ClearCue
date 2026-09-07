@@ -3978,6 +3978,7 @@ function AddMedicationModal(props: ModalProps) {
   const [medicationFilter, setMedicationFilter] =
     useState<MedicationFilter>("All");
   const [showAllSuggestions, setShowAllSuggestions] = useState(false);
+  const [showMedicationDetails, setShowMedicationDetails] = useState(true);
   const suggestions = searchMedications(props.name, medicationFilter);
   const displayedSuggestions = showAllSuggestions
     ? suggestions
@@ -4076,7 +4077,10 @@ function AddMedicationModal(props: ModalProps) {
                 accessibilityRole="button"
                 accessibilityLabel={spanish ? `Elegir ${medication.genericName}` : `Choose ${medication.genericName}`}
                 key={medication.id}
-                onPress={() => props.onSelectMedication(medication)}
+                onPress={() => {
+                  props.onSelectMedication(medication);
+                  setShowMedicationDetails(true);
+                }}
                 style={{
                   padding: 12,
                   borderRadius: 12,
@@ -4103,20 +4107,26 @@ function AddMedicationModal(props: ModalProps) {
                 </Text>
               </Pressable>
             ))}
-            {suggestions.length > displayedSuggestions.length ? (
+            {suggestions.length > 5 ? (
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel={spanish ? `Mostrar los ${suggestions.length} resultados de medicamentos` : `Show all ${suggestions.length} medication results`}
-                onPress={() => setShowAllSuggestions(true)}
+                accessibilityLabel={showAllSuggestions ? (spanish ? "Mostrar menos resultados de medicamentos" : "Show fewer medication results") : (spanish ? `Mostrar los ${suggestions.length} resultados de medicamentos` : `Show all ${suggestions.length} medication results`)}
+                onPress={() => setShowAllSuggestions((current) => !current)}
                 style={extraStyles.emptyGuide}
               >
                 <Text style={extraStyles.cardLink}>
-                  {spanish ? `Mostrar los ${suggestions.length} resultados` : `Show all ${suggestions.length} results`}
+                  {showAllSuggestions
+                    ? spanish
+                      ? "Mostrar menos"
+                      : "Show fewer"
+                    : spanish
+                      ? `Mostrar los ${suggestions.length} resultados`
+                      : `Show all ${suggestions.length} results`}
                 </Text>
               </Pressable>
             ) : null}
           </View>
-          {props.selectedMedication && (
+          {props.selectedMedication && showMedicationDetails && (
             <View
               style={{
                 backgroundColor: "#F5E5D8",
@@ -4185,7 +4195,29 @@ function AddMedicationModal(props: ModalProps) {
                   {spanish ? "Ver fuentes de DailyMed (requiere internet)" : "View DailyMed sources (requires internet)"}
                 </Text>
               </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={spanish ? "Ocultar detalles del medicamento" : "Hide medication details"}
+                onPress={() => setShowMedicationDetails(false)}
+                style={{ alignSelf: "flex-start", marginTop: 10 }}
+              >
+                <Text style={extraStyles.cardLink}>
+                  {spanish ? "Ocultar detalles" : "Hide details"}
+                </Text>
+              </Pressable>
             </View>
+          )}
+          {props.selectedMedication && !showMedicationDetails && (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={spanish ? "Mostrar detalles del medicamento" : "Show medication details"}
+              onPress={() => setShowMedicationDetails(true)}
+              style={extraStyles.emptyGuide}
+            >
+              <Text style={extraStyles.cardLink}>
+                {spanish ? "Mostrar detalles de la selección" : "Show selected medication details"}
+              </Text>
+            </Pressable>
           )}
           <TimePicker
             label={spanish ? "Primer recordatorio diario" : "First daily reminder"}

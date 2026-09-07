@@ -99,6 +99,7 @@ const STARTING_DOSES: Dose[] = [
   },
 ];
 const COLORS = ["#35A7D9", "#E88C3A", "#876CC4", "#25A77B", "#DE5D6A"];
+const NO_COLOR = "none";
 const TIME_OPTIONS = [
   "6:00 AM",
   "7:00 AM",
@@ -238,13 +239,13 @@ const extraStyles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#E7DDD4",
   },
-  supplyHelp: { color: "#6F625B", fontSize: 12, lineHeight: 17, marginTop: -6 },
+  supplyHelp: { color: "#6F625B", fontSize: 13, lineHeight: 19, marginTop: -6 },
   supplyRow: { flexDirection: "row", gap: 10 },
   supplyHalf: { flex: 1 },
   supplyFootnote: {
     color: "#6F625B",
-    fontSize: 11,
-    lineHeight: 16,
+    fontSize: 12,
+    lineHeight: 18,
     marginTop: -4,
   },
   supplyStatus: {
@@ -265,7 +266,7 @@ const extraStyles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
   },
-  timePickerValue: { color: "#3A302B", fontSize: 16, fontWeight: "700" },
+  timePickerValue: { color: "#3A302B", fontSize: 17, fontWeight: "700" },
   timePickerArrow: { color: "#B85C4A", fontSize: 18, fontWeight: "800" },
   timeMenu: {
     backgroundColor: "#FFFFFF",
@@ -288,7 +289,7 @@ const extraStyles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#B85C4A",
   },
-  timeOptionText: { color: "#6F625B", fontSize: 12, fontWeight: "800" },
+  timeOptionText: { color: "#6F625B", fontSize: 13, fontWeight: "800" },
   timeOptionTextSelected: { color: "#B85C4A" },
   clockPicker: {
     alignItems: "center",
@@ -315,7 +316,7 @@ const extraStyles = StyleSheet.create({
     position: "absolute",
   },
   clockHourSelected: { backgroundColor: "#B85C4A" },
-  clockHourText: { color: "#3A302B", fontSize: 12, fontWeight: "800" },
+  clockHourText: { color: "#3A302B", fontSize: 13, fontWeight: "800" },
   clockHourTextSelected: { color: "#FFFFFF" },
   clockCenterText: {
     alignSelf: "center",
@@ -338,7 +339,7 @@ const extraStyles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
   },
   clockMinuteSelected: { backgroundColor: "#F5E5D8", borderWidth: 1, borderColor: "#B85C4A" },
-  clockMinuteText: { color: "#6F625B", fontSize: 12, fontWeight: "800" },
+  clockMinuteText: { color: "#6F625B", fontSize: 13, fontWeight: "800" },
   clockMinuteTextSelected: { color: "#B85C4A" },
   clockPeriodRow: { flexDirection: "row", gap: 8 },
   clockPeriod: {
@@ -349,7 +350,7 @@ const extraStyles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
   },
   clockPeriodSelected: { backgroundColor: "#F5E5D8", borderWidth: 1, borderColor: "#B85C4A" },
-  clockPeriodText: { color: "#6F625B", fontSize: 12, fontWeight: "800" },
+  clockPeriodText: { color: "#6F625B", fontSize: 13, fontWeight: "800" },
   clockPeriodTextSelected: { color: "#B85C4A" },
   dateMenu: {
     backgroundColor: "#FFFFFF",
@@ -373,13 +374,13 @@ const extraStyles = StyleSheet.create({
     justifyContent: "center",
   },
   dateMonthButtonText: { color: "#B85C4A", fontSize: 24, lineHeight: 27 },
-  dateMonthLabel: { color: "#3A302B", fontSize: 14, fontWeight: "800" },
+  dateMonthLabel: { color: "#3A302B", fontSize: 15, fontWeight: "800" },
   dateWeekRow: { flexDirection: "row" },
   dateWeekday: {
     width: "14.2857%",
     textAlign: "center",
     color: "#6F625B",
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: "800",
   },
   dateGrid: { flexDirection: "row", flexWrap: "wrap" },
@@ -391,7 +392,7 @@ const extraStyles = StyleSheet.create({
     borderRadius: 18,
   },
   dateCellSelected: { backgroundColor: "#B85C4A" },
-  dateCellText: { color: "#3A302B", fontSize: 12, fontWeight: "700" },
+  dateCellText: { color: "#3A302B", fontSize: 13, fontWeight: "700" },
   dateCellTextSelected: { color: "#FFFFFF" },
   extraTimes: {
     backgroundColor: "#EFF8F5",
@@ -418,7 +419,7 @@ const extraStyles = StyleSheet.create({
     padding: 11,
     backgroundColor: "#FFFFFF",
   },
-  addTimeText: { color: "#B85C4A", fontSize: 13, fontWeight: "800" },
+  addTimeText: { color: "#B85C4A", fontSize: 14, fontWeight: "800" },
   filterRow: { flexDirection: "row", flexWrap: "wrap", gap: 7 },
   languageSupportNote: {
     color: "#6F625B",
@@ -435,7 +436,7 @@ const extraStyles = StyleSheet.create({
     paddingVertical: 7,
   },
   filterChipSelected: { borderColor: "#B85C4A", backgroundColor: "#F5E5D8" },
-  filterChipText: { color: "#6F625B", fontSize: 11, fontWeight: "800" },
+  filterChipText: { color: "#6F625B", fontSize: 12, fontWeight: "800" },
   filterChipTextSelected: { color: "#B85C4A" },
   onboardingScreen: {
     flex: 1,
@@ -955,7 +956,7 @@ export default function App() {
   const [time, setTime] = useState("9:00 AM");
   const [additionalTimes, setAdditionalTimes] = useState<string[]>([]);
   const [eye, setEye] = useState<Eye>("Right eye");
-  const [color, setColor] = useState(COLORS[0]);
+  const [color, setColor] = useState(NO_COLOR);
   const [taperPlan, setTaperPlan] = useState("");
   const [prescriber, setPrescriber] = useState("");
   const [prescriberPhone, setPrescriberPhone] = useState("");
@@ -1416,7 +1417,7 @@ export default function App() {
     setTime("9:00 AM");
     setAdditionalTimes([]);
     setEye("Right eye");
-    setColor(COLORS[0]);
+    setColor(NO_COLOR);
     setTaperPlan("");
     setPrescriber("");
     setPrescriberPhone("");
@@ -1478,7 +1479,7 @@ export default function App() {
     setTime("9:00 AM");
     setAdditionalTimes([]);
     setEye("Right eye");
-    setColor(COLORS[0]);
+    setColor(NO_COLOR);
     setTaperPlan("");
     setPrescriber("");
     setPrescriberPhone("");
@@ -1753,6 +1754,7 @@ export default function App() {
                 onAdd={startAddingDose}
                 onGuide={() => setGuideOpen(true)}
                 language={settings.language}
+                largeText={settings.largeText}
               />
             )}
           </View>
@@ -1862,6 +1864,7 @@ export default function App() {
           openedOn={openedOn}
           warningDays={warningDays}
           language={settings.language}
+          largeText={settings.largeText}
           deleteConfirming={deleteConfirming}
           formNotice={routineFormNotice}
           selectedMedication={selectedMedication}
@@ -2076,6 +2079,7 @@ function EmptyRoutine({
   onAdd: () => void;
   onGuide: () => void;
   language: "en" | "es";
+  largeText: boolean;
 }) {
   const spanish = language === "es";
   return (
@@ -2246,8 +2250,12 @@ function DoseCard({
 }) {
   const dose = doses[0];
   const colorName =
-    COLOR_NAMES[dose.color]?.[language] ??
-    (language === "es" ? "Personalizado" : "Custom");
+    dose.color === NO_COLOR
+      ? language === "es"
+        ? "Sin color especificado"
+        : "No color specified"
+      : COLOR_NAMES[dose.color]?.[language] ??
+        (language === "es" ? "Personalizado" : "Custom");
   const estimate = supplyEstimate(dose.supply);
   const estimateText = estimate
     ? estimate.isWarning
@@ -2268,7 +2276,7 @@ function DoseCard({
       ]}
     >
       <View
-        style={[extraStyles.medicationStripe, { backgroundColor: dose.color }]}
+        style={[extraStyles.medicationStripe, { backgroundColor: dose.color === NO_COLOR ? "#D6C4B8" : dose.color }]}
       />
       <View style={extraStyles.medicationBody}>
         <View style={extraStyles.medicationTop}>
@@ -2448,7 +2456,7 @@ function buildAdherence(
     ).length;
     return {
       name: dose.name,
-      color: dose.color,
+      color: dose.color === NO_COLOR ? "#B7AAA0" : dose.color,
       percent: doseStatuses.length
         ? Math.round((doseTaken / doseStatuses.length) * 100)
         : 0,
@@ -3932,6 +3940,7 @@ type ModalProps = {
   openedOn: string;
   warningDays: string;
   language: "en" | "es";
+  largeText: boolean;
   deleteConfirming: boolean;
   formNotice: { title: string; message: string; allowReview?: boolean } | null;
   selectedMedication: CatalogMedication | null;
@@ -3977,9 +3986,17 @@ function AddMedicationModal(props: ModalProps) {
   const spanish = props.language === "es";
   const [medicationFilter, setMedicationFilter] =
     useState<MedicationFilter>("All");
+  const [catalogQuery, setCatalogQuery] = useState("");
   const [showAllSuggestions, setShowAllSuggestions] = useState(false);
   const [showMedicationDetails, setShowMedicationDetails] = useState(true);
-  const suggestions = searchMedications(props.name, medicationFilter);
+  useEffect(() => {
+    if (props.visible) {
+      setCatalogQuery("");
+      setShowAllSuggestions(false);
+      setShowMedicationDetails(true);
+    }
+  }, [props.visible]);
+  const suggestions = searchMedications(catalogQuery, medicationFilter);
   const displayedSuggestions = showAllSuggestions
     ? suggestions
     : suggestions.slice(0, 5);
@@ -4032,6 +4049,7 @@ function AddMedicationModal(props: ModalProps) {
               value={props.name}
               onChangeText={(value) => {
                 setShowAllSuggestions(false);
+                setCatalogQuery(value);
                 props.onName(value);
               }}
               placeholder={props.language === "es" ? "Nombre genérico, marca o nombre común" : "Generic, brand, or common name"}
@@ -4224,6 +4242,7 @@ function AddMedicationModal(props: ModalProps) {
             value={props.time}
             onChange={props.onTime}
             language={props.language}
+            largeText={props.largeText}
           />
           <View style={extraStyles.extraTimes}>
             <Text style={styles.fieldLabel}>{spanish ? "Recordatorios diarios adicionales" : "Additional daily reminders"}</Text>
@@ -4244,6 +4263,7 @@ function AddMedicationModal(props: ModalProps) {
                       )
                     }
                     language={props.language}
+                    largeText={props.largeText}
                   />
                 </View>
                 <Pressable
@@ -4420,6 +4440,7 @@ function AddMedicationModal(props: ModalProps) {
               value={props.openedOn}
               onChange={props.onOpenedOn}
               language={props.language}
+              largeText={props.largeText}
             />
             <Field label={spanish ? "Avisarme esta cantidad de días antes de la estimación" : "Warn me this many days before estimate"}>
               <TextInput
@@ -4461,8 +4482,21 @@ function AddMedicationModal(props: ModalProps) {
               ))}
             </View>
           </Field>
-          <Field label={spanish ? "Color de la etiqueta del frasco" : "Bottle label color"}>
+          <Field label={spanish ? "Color de la etiqueta del frasco (opcional)" : "Bottle label color (optional)"}>
             <View style={styles.colorRow}>
+              <Pressable
+                accessibilityRole="radio"
+                accessibilityState={{ selected: props.color === NO_COLOR }}
+                accessibilityLabel={spanish ? "No especificar color de etiqueta" : "Do not specify a label color"}
+                onPress={() => props.onColor(NO_COLOR)}
+                style={[
+                  styles.colorChoice,
+                  styles.noColorChoice,
+                  props.color === NO_COLOR && styles.colorSelected,
+                ]}
+              >
+                <Text style={styles.noColorChoiceText}>—</Text>
+              </Pressable>
               {COLORS.map((item) => (
                 <Pressable
                   accessibilityRole="radio"
@@ -4569,11 +4603,13 @@ function TimePicker({
   value,
   onChange,
   language,
+  largeText,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   language: "en" | "es";
+  largeText: boolean;
 }) {
   const spanish = language === "es";
   const [open, setOpen] = useState(false);
@@ -4587,7 +4623,7 @@ function TimePicker({
         onPress={() => setOpen((current) => !current)}
         style={extraStyles.timePickerButton}
       >
-        <Text style={extraStyles.timePickerValue}>
+        <Text style={[extraStyles.timePickerValue, largeText && { fontSize: 19 }]}>
           {value || (spanish ? "Selecciona una hora" : "Select a time")}
         </Text>
         <Text style={extraStyles.timePickerArrow}>{open ? "⌃" : "⌄"}</Text>
@@ -4625,7 +4661,7 @@ function TimePicker({
           <Text style={[styles.fieldLabel, { marginTop: 5 }]}>
             {spanish ? "O establece una hora personalizada" : "Or set a custom time"}
           </Text>
-          <ClockDial value={value} onChange={onChange} language={language} />
+          <ClockDial value={value} onChange={onChange} language={language} largeText={largeText} />
           <TextInput
             accessibilityLabel={`Custom ${label.toLowerCase()}`}
             value={value}
@@ -4646,10 +4682,12 @@ function ClockDial({
   value,
   onChange,
   language,
+  largeText,
 }: {
   value: string;
   onChange: (value: string) => void;
   language: "en" | "es";
+  largeText: boolean;
 }) {
   const clock = parseReminderTime(value) ?? { hour: 9, minute: 0 };
   const displayHour = clock.hour % 12 || 12;
@@ -4689,7 +4727,8 @@ function ClockDial({
             >
               <Text
                 style={[
-                  extraStyles.clockHourText,
+                extraStyles.clockHourText,
+                largeText && { fontSize: 15 },
                   displayHour === hour && extraStyles.clockHourTextSelected,
                 ]}
               >
@@ -4718,6 +4757,7 @@ function ClockDial({
             <Text
               style={[
                 extraStyles.clockMinuteText,
+                largeText && { fontSize: 15 },
                 clock.minute === minute && extraStyles.clockMinuteTextSelected,
               ]}
             >
@@ -4768,11 +4808,13 @@ function DatePicker({
   value,
   onChange,
   language,
+  largeText,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   language: "en" | "es";
+  largeText: boolean;
 }) {
   const spanish = language === "es";
   const [open, setOpen] = useState(false);
@@ -4813,7 +4855,7 @@ function DatePicker({
         onPress={openCalendar}
         style={extraStyles.timePickerButton}
       >
-        <Text style={extraStyles.timePickerValue}>{value}</Text>
+        <Text style={[extraStyles.timePickerValue, largeText && { fontSize: 19 }]}>{value}</Text>
         <Text style={extraStyles.timePickerArrow}>{open ? "⌃" : "⌄"}</Text>
       </Pressable>
       {open && (
@@ -4832,7 +4874,7 @@ function DatePicker({
             >
               <Text style={extraStyles.dateMonthButtonText}>‹</Text>
             </Pressable>
-            <Text style={extraStyles.dateMonthLabel}>{monthLabel}</Text>
+            <Text style={[extraStyles.dateMonthLabel, largeText && { fontSize: 17 }]}>{monthLabel}</Text>
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={spanish ? "Mes siguiente" : "Next month"}
@@ -4889,6 +4931,7 @@ function DatePicker({
                   <Text
                     style={[
                       extraStyles.dateCellText,
+                      largeText && { fontSize: 15 },
                       selectedDate.getFullYear() === visibleMonth.getFullYear() &&
                         selectedDate.getMonth() === visibleMonth.getMonth() &&
                         selectedDate.getDate() === day &&
@@ -5271,19 +5314,19 @@ const styles = StyleSheet.create({
   closeText: { fontSize: 25, color: "#B85C4A", lineHeight: 28 },
   form: { padding: 22, gap: 22 },
   fieldLabel: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: "800",
     color: "#3A302B",
     marginBottom: 8,
   },
   input: {
-    height: 48,
+    height: 50,
     backgroundColor: "#fff",
     borderColor: "#E7DDD4",
     borderWidth: 1,
     borderRadius: 12,
     paddingHorizontal: 13,
-    fontSize: 16,
+    fontSize: 17,
     color: "#3A302B",
   },
   choiceRow: { flexDirection: "row", gap: 8 },
@@ -5297,7 +5340,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
   },
   choiceSelected: { backgroundColor: "#F5E5D8", borderColor: "#B85C4A" },
-  choiceText: { fontSize: 13, fontWeight: "700", color: "#6F625B" },
+  choiceText: { fontSize: 14, fontWeight: "700", color: "#6F625B" },
   choiceTextSelected: { color: "#B85C4A" },
   colorRow: { flexDirection: "row", gap: 12 },
   colorChoice: {
@@ -5308,9 +5351,11 @@ const styles = StyleSheet.create({
     borderColor: "#fff",
   },
   colorSelected: { borderColor: "#3A302B" },
+  noColorChoice: { backgroundColor: "#F2EBE4", alignItems: "center", justifyContent: "center" },
+  noColorChoiceText: { color: "#6F625B", fontSize: 18, fontWeight: "800", lineHeight: 20 },
   note: { backgroundColor: "#F5E5D8", borderRadius: 14, padding: 15 },
-  noteTitle: { fontWeight: "800", color: "#704D30", fontSize: 13 },
-  noteText: { color: "#704D30", fontSize: 12, lineHeight: 17, marginTop: 4 },
+  noteTitle: { fontWeight: "800", color: "#704D30", fontSize: 14 },
+  noteText: { color: "#704D30", fontSize: 13, lineHeight: 19, marginTop: 4 },
   saveButton: {
     backgroundColor: "#B85C4A",
     borderRadius: 14,

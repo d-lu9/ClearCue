@@ -33,7 +33,8 @@ The current ClearCue app is the Expo project in [`mobile/`](mobile). It is the o
 ### Current release — v1.26
 
 - One clear home card per medication, even when it has several daily times; each time keeps its own completion and history actions.
-- Medication search results and selected-medication details can expand or collapse, keeping the rest of the routine form reachable.
+- Medication browsing stays stable after a selection, and both search results and selected-medication details can expand or collapse without hiding the rest of the routine form.
+- Bottle-label color is optional; add/edit menus use slightly larger text throughout, with additional scaling for expanded time and calendar controls when Large text is on.
 - A calmer onboarding experience: the full welcome guide appears only on first launch, after an intentional erase-all-data action, or when opened from Settings.
 - Spanish coverage for the core routine, medication form, calendar/time controls, Settings, and Insights. Drug and official source names remain unchanged for accuracy.
 

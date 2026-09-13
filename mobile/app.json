@@ -11,9 +11,19 @@
       "backgroundColor": "#FAF7F2"
     },
     "userInterfaceStyle": "light",
-    "plugins": ["expo-notifications"],
+    "plugins": [
+      "expo-notifications",
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Use Face ID to protect your ClearCue medication plan."
+        }
+      ],
+      "expo-apple-authentication"
+    ],
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "usesAppleSignIn": true
     },
     "android": {
       "adaptiveIcon": {

@@ -26,6 +26,7 @@ The current ClearCue app is the Expo project in [`mobile/`](mobile). It is the o
 - Clinician-safe “How to use drops” guide, including urgent-symptoms guidance
 - Accessibility defaults: large text, high contrast, VoiceOver labels, reduced motion, color-safe labels, and Spanish across the core routine, Settings, and Insights
 - Demo Mode, onboarding, app icon/splash screen, and device-only privacy controls
+- Optional device lock for the medication plan using Face ID, Touch ID, or device passcode in a standalone iPhone build
 - A focused home screen that prioritizes today’s eye-drop routine; reports, privacy, and accessibility are grouped under More care tools
 
 ## Release highlights
@@ -72,5 +73,7 @@ Test on a physical iPhone in a standalone ClearCue build—not Expo Go:
 - Grant, deny, then re-grant notification permission; confirm the reminder checkup reports the correct state and next reminder.
 - Confirm a scheduled reminder appears while the app is backgrounded, and that its Taken and Skip actions update today’s timeline and history correctly.
 - Leave a routine scheduled across midnight, then confirm the new day’s timeline and completion state are correct.
+- Turn on the optional ClearCue app lock, leave and return to the app, then confirm Face ID or device-passcode unlock works. Face ID itself is not available for testing in Expo Go.
+- Confirm the standalone build includes the Sign in with Apple capability. ClearCue does not yet show a sign-in control because it has no cloud account or caregiver-sync service to attach it to.
 
 The source type-checks successfully. A full iOS bundle still needs a macOS/iOS build environment: the current Windows environment cannot run Expo’s Hermes compiler, which is an environment permission limitation rather than an identified ClearCue build failure.

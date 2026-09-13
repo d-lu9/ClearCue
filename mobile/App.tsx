@@ -1,5 +1,6 @@
 import { StatusBar } from "expo-status-bar";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as LocalAuthentication from "expo-local-authentication";
 import * as Notifications from "expo-notifications";
 import {
   CatalogMedication,
@@ -75,6 +76,7 @@ type AppSettings = {
   highContrast: boolean;
   reduceMotion: boolean;
   hideNotificationDetails: boolean;
+  appLockEnabled: boolean;
   language: "en" | "es";
 };
 const STARTING_DOSES: Dose[] = [
@@ -135,6 +137,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   highContrast: true,
   reduceMotion: false,
   hideNotificationDetails: true,
+  appLockEnabled: false,
   language: "en",
 };
 const COLOR_NAMES: Record<string, { en: string; es: string }> = {
@@ -230,6 +233,32 @@ function SafeAreaView({
 }
 
 const extraStyles = StyleSheet.create({
+  appLockScreen: {
+    flex: 1,
+    backgroundColor: "#FAF7F2",
+    padding: 28,
+    justifyContent: "space-between",
+  },
+  appLockContent: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 16,
+  },
+  appLockTitle: {
+    color: "#3A302B",
+    fontSize: 30,
+    fontWeight: "800",
+    letterSpacing: -0.7,
+    textAlign: "center",
+  },
+  appLockBody: {
+    color: "#6F625B",
+    fontSize: 16,
+    lineHeight: 23,
+    maxWidth: 310,
+    textAlign: "center",
+  },
   supplySection: {
     backgroundColor: "#EFF8F5",
     borderRadius: 14,
@@ -1050,6 +1079,7 @@ export default function App() {
   const [privacyOpen, setPrivacyOpen] = useState(false);
   const [guideOpen, setGuideOpen] = useState(false);
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
+  const [appLocked, setAppLocked] = useState(false);
   const [onboardingVisible, setOnboardingVisible] = useState(false);
   const [showOnboardingAfterPrivacy, setShowOnboardingAfterPrivacy] =
     useState(false);
@@ -1101,12 +1131,14 @@ export default function App() {
           await AsyncStorage.getItem(TRACKING_START_KEY);
         if (savedTrackingStart) setTrackingStart(savedTrackingStart);
         const savedSettings = await AsyncStorage.getItem(SETTINGS_KEY);
-        if (savedSettings)
-          setSettings({
+        if (savedSettings) {
+          const restoredSettings = {
             ...DEFAULT_SETTINGS,
             ...(JSON.parse(savedSettings) as AppSettings),
-          });
-        else if (await AccessibilityInfo.isReduceMotionEnabled())
+          };
+          setSettings(restoredSettings);
+          setAppLocked(restoredSettings.appLockEnabled);
+        } else if (await AccessibilityInfo.isReduceMotionEnabled())
           setSettings((current) => ({ ...current, reduceMotion: true }));
         await AsyncStorage.multiRemove([
           "clearcue-contact-lens-v1",
@@ -1181,6 +1213,12 @@ export default function App() {
       "change",
       (state) => {
         if (state === "active") refreshDailyCompletion();
+        if (
+          (state === "background" || state === "inactive") &&
+          hydrated &&
+          settings.appLockEnabled
+        )
+          setAppLocked(true);
       },
     );
     const timer = setInterval(refreshDailyCompletion, 60_000);
@@ -1188,7 +1226,7 @@ export default function App() {
       appStateSubscription.remove();
       clearInterval(timer);
     };
-  }, [history]);
+  }, [history, hydrated, settings.appLockEnabled]);
   useEffect(() => {
     void Notifications.setNotificationCategoryAsync(DOSE_REMINDER_CATEGORY, [
       {
@@ -1759,6 +1797,54 @@ export default function App() {
   function openInsights() {
     setShowInsights(true);
   }
+  async function authenticateAppLock() {
+    try {
+      const [hasHardware, isEnrolled] = await Promise.all([
+        LocalAuthentication.hasHardwareAsync(),
+        LocalAuthentication.isEnrolledAsync(),
+      ]);
+      if (!hasHardware || !isEnrolled) {
+        Alert.alert(
+          settings.language === "es"
+            ? "La protección del dispositivo no está lista"
+            : "Device protection is not ready",
+          settings.language === "es"
+            ? "Configura Face ID, Touch ID o un código del dispositivo antes de activar el bloqueo de ClearCue."
+            : "Set up Face ID, Touch ID, or a device passcode before turning on ClearCue app lock.",
+        );
+        return false;
+      }
+      const result = await LocalAuthentication.authenticateAsync({
+        promptMessage:
+          settings.language === "es"
+            ? "Desbloquea tu plan de medicamentos de ClearCue"
+            : "Unlock your ClearCue medication plan",
+        fallbackLabel: settings.language === "es" ? "Usar código" : "Use Passcode",
+        cancelLabel: settings.language === "es" ? "Ahora no" : "Not now",
+      });
+      return result.success;
+    } catch {
+      Alert.alert(
+        settings.language === "es"
+          ? "No se pudo verificar la protección del dispositivo"
+          : "Could not verify device protection",
+        settings.language === "es"
+          ? "Inténtalo de nuevo en una compilación de desarrollo de ClearCue o TestFlight en tu iPhone."
+          : "Try again in a ClearCue development or TestFlight build on your iPhone.",
+      );
+      return false;
+    }
+  }
+  async function changeAppLock(enabled: boolean) {
+    if (!enabled) {
+      setSettings((current) => ({ ...current, appLockEnabled: false }));
+      setAppLocked(false);
+      return;
+    }
+    if (!(await authenticateAppLock())) return;
+    setSettings((current) => ({ ...current, appLockEnabled: true }));
+    setAppLocked(false);
+  }
   return (
     <>
       <SafeAreaView
@@ -2150,6 +2236,7 @@ export default function App() {
       <PrivacyModal
         visible={privacyOpen}
         animation={settings.reduceMotion ? "none" : "slide"}
+        language={settings.language}
         hideNotificationDetails={settings.hideNotificationDetails}
         onHideNotificationDetails={(value) =>
           setSettings((current) => ({
@@ -2157,6 +2244,8 @@ export default function App() {
             hideNotificationDetails: value,
           }))
         }
+        appLockEnabled={settings.appLockEnabled}
+        onAppLockChange={(value) => void changeAppLock(value)}
         onErase={eraseRoutineData}
         onClose={() => setPrivacyOpen(false)}
         onDismiss={() => {
@@ -2194,6 +2283,15 @@ export default function App() {
         visible={guideOpen}
         animation={settings.reduceMotion ? "none" : "slide"}
         onClose={() => setGuideOpen(false)}
+      />
+      <AppLockModal
+        visible={hydrated && appLocked}
+        language={settings.language}
+        onUnlock={() =>
+          void authenticateAppLock().then((success) => {
+            if (success) setAppLocked(false);
+          })
+        }
       />
       <OnboardingModal
         visible={onboardingVisible}
@@ -3090,24 +3188,83 @@ function ReportMetric({ value, label }: { value: string; label: string }) {
     </View>
   );
 }
+function AppLockModal({
+  visible,
+  language,
+  onUnlock,
+}: {
+  visible: boolean;
+  language: "en" | "es";
+  onUnlock: () => void;
+}) {
+  const spanish = language === "es";
+  return (
+    <Modal
+      visible={visible}
+      animationType="fade"
+      presentationStyle="fullScreen"
+      onRequestClose={() => undefined}
+    >
+      <SafeAreaView style={extraStyles.appLockScreen}>
+        <View style={extraStyles.appLockContent}>
+          <View style={styles.logo}>
+            <Text style={styles.logoText}>◒</Text>
+          </View>
+          <Text style={styles.sectionLabel}>
+            {spanish ? "PRIVADO POR DEFECTO" : "PRIVATE BY DEFAULT"}
+          </Text>
+          <Text style={extraStyles.appLockTitle}>
+            {spanish ? "Tu plan está protegido" : "Your plan is protected"}
+          </Text>
+          <Text style={extraStyles.appLockBody}>
+            {spanish
+              ? "Usa Face ID, Touch ID o el código de tu dispositivo para abrir ClearCue."
+              : "Use Face ID, Touch ID, or your device passcode to open ClearCue."}
+          </Text>
+        </View>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={
+            spanish
+              ? "Desbloquear el plan de medicamentos de ClearCue"
+              : "Unlock ClearCue medication plan"
+          }
+          onPress={onUnlock}
+          style={styles.saveButton}
+        >
+          <Text style={styles.saveText}>
+            {spanish ? "Desbloquear ClearCue" : "Unlock ClearCue"}
+          </Text>
+        </Pressable>
+      </SafeAreaView>
+    </Modal>
+  );
+}
 function PrivacyModal({
   visible,
   animation,
+  language,
   hideNotificationDetails,
   onHideNotificationDetails,
+  appLockEnabled,
+  onAppLockChange,
   onErase,
   onClose,
   onDismiss,
 }: {
   visible: boolean;
   animation: "none" | "slide";
+  language: "en" | "es";
   hideNotificationDetails: boolean;
   onHideNotificationDetails: (value: boolean) => void;
+  appLockEnabled: boolean;
+  onAppLockChange: (value: boolean) => void;
   onErase: () => void;
   onClose: () => void;
   onDismiss: () => void;
 }) {
   const [eraseConfirming, setEraseConfirming] = useState(false);
+  const spanish = language === "es";
   return (
     <Modal
       visible={visible}
@@ -3146,6 +3303,25 @@ function PrivacyModal({
             value={hideNotificationDetails}
             onChange={onHideNotificationDetails}
           />
+          <SettingRow
+            title={
+              spanish
+                ? "Proteger ClearCue con Face ID"
+                : "Protect ClearCue with Face ID"
+            }
+            detail={
+              spanish
+                ? "Usa Face ID, Touch ID o el código de tu dispositivo para desbloquear tu plan cuando ClearCue vuelve al frente."
+                : "Use Face ID, Touch ID, or your device passcode to unlock your medication plan after ClearCue leaves the foreground."
+            }
+            value={appLockEnabled}
+            onChange={onAppLockChange}
+          />
+          <Text style={styles.settingsIntro}>
+            {spanish
+              ? "Face ID requiere una compilación de desarrollo de ClearCue o TestFlight en un iPhone; no se puede probar completamente en Expo Go."
+              : "Face ID requires a ClearCue development or TestFlight build on an iPhone; it cannot be fully tested in Expo Go."}
+          </Text>
           <View style={styles.note}>
             <Text style={styles.noteTitle}>Sharing stays in your control</Text>
             <Text style={styles.noteText}>

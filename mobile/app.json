@@ -18,12 +18,10 @@
         {
           "faceIDPermission": "Use Face ID to protect your ClearCue medication plan."
         }
-      ],
-      "expo-apple-authentication"
+      ]
     ],
     "ios": {
-      "supportsTablet": true,
-      "usesAppleSignIn": true
+      "supportsTablet": true
     },
     "android": {
       "adaptiveIcon": {

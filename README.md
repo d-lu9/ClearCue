@@ -74,6 +74,5 @@ Test on a physical iPhone in a standalone ClearCue build—not Expo Go:
 - Confirm a scheduled reminder appears while the app is backgrounded, and that its Taken and Skip actions update today’s timeline and history correctly.
 - Leave a routine scheduled across midnight, then confirm the new day’s timeline and completion state are correct.
 - Turn on the optional ClearCue app lock, leave and return to the app, then confirm Face ID or device-passcode unlock works. Face ID itself is not available for testing in Expo Go.
-- Confirm the standalone build includes the Sign in with Apple capability. ClearCue does not yet show a sign-in control because it has no cloud account or caregiver-sync service to attach it to.
 
 The source type-checks successfully. A full iOS bundle still needs a macOS/iOS build environment: the current Windows environment cannot run Expo’s Hermes compiler, which is an environment permission limitation rather than an identified ClearCue build failure.

@@ -1046,6 +1046,7 @@ export default function App() {
   const demoTransitionInProgress = useRef(false);
   const reminderUpdateInProgress = useRef(false);
   const routineSaveInProgress = useRef(false);
+  const handledNotificationResponses = useRef(new Set<string>());
   const personalSnapshot = useRef<{
     doses: Dose[];
     history: DoseLog[];
@@ -1232,27 +1233,38 @@ export default function App() {
       {
         identifier: "TAKEN",
         buttonTitle: "Taken",
-        options: { opensAppToForeground: false },
+        options: { opensAppToForeground: true },
       },
       {
         identifier: "SNOOZE",
         buttonTitle: "Snooze 10 min",
-        options: { opensAppToForeground: false },
+        options: { opensAppToForeground: true },
       },
       {
         identifier: "SKIP",
         buttonTitle: "Skip",
-        options: { opensAppToForeground: false },
+        options: { opensAppToForeground: true },
       },
     ]);
-    const subscription = Notifications.addNotificationResponseReceivedListener(
-      (response) => {
-        const doseId = response.notification.request.content.data?.doseId;
-        if (typeof doseId !== "string" || demoMode) return;
-        if (response.actionIdentifier === "TAKEN") recordDose(doseId, "taken");
-        if (response.actionIdentifier === "SKIP") recordDose(doseId, "skipped");
-        if (response.actionIdentifier === "SNOOZE")
-          void Notifications.scheduleNotificationAsync({
+    async function handleNotificationResponse(
+      response: Notifications.NotificationResponse,
+    ) {
+      if (!hydrated || demoMode) return;
+      const doseId = response.notification.request.content.data?.doseId;
+      const action = response.actionIdentifier;
+      if (
+        typeof doseId !== "string" ||
+        !["TAKEN", "SKIP", "SNOOZE"].includes(action)
+      )
+        return;
+      const responseKey = `${response.notification.request.identifier}:${action}`;
+      if (handledNotificationResponses.current.has(responseKey)) return;
+      handledNotificationResponses.current.add(responseKey);
+      try {
+        if (action === "TAKEN") recordDose(doseId, "taken");
+        if (action === "SKIP") recordDose(doseId, "skipped");
+        if (action === "SNOOZE")
+          await Notifications.scheduleNotificationAsync({
             content: {
               title: "ClearCue reminder",
               body: settings.hideNotificationDetails
@@ -1267,10 +1279,23 @@ export default function App() {
               date: new Date(Date.now() + 10 * 60_000),
             },
           });
+        Notifications.clearLastNotificationResponse();
+      } catch (error) {
+        handledNotificationResponses.current.delete(responseKey);
+        throw error;
+      }
+    }
+    const subscription = Notifications.addNotificationResponseReceivedListener(
+      (response) => {
+        void handleNotificationResponse(response).catch(() => undefined);
       },
     );
+    if (hydrated)
+      void Notifications.getLastNotificationResponseAsync()
+        .then((response) => response && handleNotificationResponse(response))
+        .catch(() => undefined);
     return () => subscription.remove();
-  }, [demoMode, settings.hideNotificationDetails]);
+  }, [demoMode, doses, hydrated, settings.hideNotificationDetails]);
   const complete = doses.filter((dose) => dose.completed).length;
   const percentage = doses.length
     ? Math.round((complete / doses.length) * 100)

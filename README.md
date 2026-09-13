@@ -71,7 +71,7 @@ Catalog changes are reviewed and shipped in app releases rather than downloaded 
 Test on a physical iPhone in a standalone ClearCue build—not Expo Go:
 
 - Grant, deny, then re-grant notification permission; confirm the reminder checkup reports the correct state and next reminder.
-- Confirm a scheduled reminder appears while the app is backgrounded, and that its Taken and Skip actions update today’s timeline and history correctly.
+- Confirm a scheduled reminder appears while the app is backgrounded or fully closed. Its Taken, Skip, and Snooze actions should open ClearCue once, update today’s timeline/history, and never record the same response twice.
 - Leave a routine scheduled across midnight, then confirm the new day’s timeline and completion state are correct.
 - Turn on the optional ClearCue app lock, leave and return to the app, then confirm Face ID or device-passcode unlock works. Face ID itself is not available for testing in Expo Go.
 

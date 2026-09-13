@@ -955,7 +955,9 @@ function localizedMedicationFilter(filter: MedicationFilter, language: "en" | "e
 async function scheduleReminders(
   doses: Dose[],
   hideNotificationDetails: boolean,
+  language: "en" | "es",
 ) {
+  const spanish = language === "es";
   await Notifications.cancelAllScheduledNotificationsAsync();
   const validDoses = doses
     .map((dose) => ({ dose, clock: parseReminderTime(dose.time) }))
@@ -966,10 +968,12 @@ async function scheduleReminders(
   for (const { dose, clock } of validDoses) {
     await Notifications.scheduleNotificationAsync({
       content: {
-        title: "ClearCue reminder",
+        title: spanish ? "Recordatorio de ClearCue" : "ClearCue reminder",
         body: hideNotificationDetails
-          ? "A scheduled eye-drop reminder is due."
-          : `${dose.name} · ${dose.eye}`,
+          ? spanish
+            ? "Un recordatorio programado de gotas está pendiente."
+            : "A scheduled eye-drop reminder is due."
+          : `${dose.name} · ${localizedEye(dose.eye, language)}`,
         sound: "default",
         categoryIdentifier: DOSE_REMINDER_CATEGORY,
         data: { doseId: dose.id },
@@ -996,10 +1000,14 @@ async function scheduleReminders(
   for (const { dose, estimate } of refillDates) {
     await Notifications.scheduleNotificationAsync({
       content: {
-        title: "ClearCue refill estimate",
+        title: spanish ? "Estimación de reposición de ClearCue" : "ClearCue refill estimate",
         body: hideNotificationDetails
-          ? "A medication supply estimate needs your attention."
-          : `${dose.name} may be running low. Confirm your refill with your pharmacy or clinician.`,
+          ? spanish
+            ? "Una estimación de suministro de medicamento necesita tu atención."
+            : "A medication supply estimate needs your attention."
+          : spanish
+            ? `${dose.name} podría estar por terminarse. Confirma la reposición con tu farmacia o profesional.`
+            : `${dose.name} may be running low. Confirm your refill with your pharmacy or clinician.`,
         sound: "default",
         data: { doseId: dose.id, kind: "refill-estimate" },
       },
@@ -1047,6 +1055,7 @@ export default function App() {
   const reminderUpdateInProgress = useRef(false);
   const routineSaveInProgress = useRef(false);
   const handledNotificationResponses = useRef(new Set<string>());
+  const previousLanguage = useRef(DEFAULT_SETTINGS.language);
   const personalSnapshot = useRef<{
     doses: Dose[];
     history: DoseLog[];
@@ -1157,8 +1166,8 @@ export default function App() {
         }
       } catch {
         Alert.alert(
-          "Could not restore saved routine",
-          "ClearCue will continue with the current routine.",
+          "Could not restore saved routine / No se pudo restaurar la rutina guardada",
+          "ClearCue will continue with the current routine. / ClearCue continuará con la rutina actual.",
         );
       } finally {
         setHydrated(true);
@@ -1190,6 +1199,15 @@ export default function App() {
         () => undefined,
       );
   }, [settings, hydrated]);
+  useEffect(() => {
+    if (
+      hydrated &&
+      previousLanguage.current !== settings.language &&
+      remindersEnabled
+    )
+      setRemindersNeedRefresh(true);
+    previousLanguage.current = settings.language;
+  }, [hydrated, remindersEnabled, settings.language]);
   useEffect(() => {
     function refreshDailyCompletion() {
       const today = dateKey(new Date());
@@ -1228,17 +1246,17 @@ export default function App() {
     void Notifications.setNotificationCategoryAsync(DOSE_REMINDER_CATEGORY, [
       {
         identifier: "TAKEN",
-        buttonTitle: "Taken",
+        buttonTitle: settings.language === "es" ? "Tomada" : "Taken",
         options: { opensAppToForeground: true },
       },
       {
         identifier: "SNOOZE",
-        buttonTitle: "Snooze 10 min",
+        buttonTitle: settings.language === "es" ? "Posponer 10 min" : "Snooze 10 min",
         options: { opensAppToForeground: true },
       },
       {
         identifier: "SKIP",
-        buttonTitle: "Skip",
+        buttonTitle: settings.language === "es" ? "Omitir" : "Skip",
         options: { opensAppToForeground: true },
       },
     ]);
@@ -1262,9 +1280,13 @@ export default function App() {
         if (action === "SNOOZE")
           await Notifications.scheduleNotificationAsync({
             content: {
-              title: "ClearCue reminder",
-              body: settings.hideNotificationDetails
-                ? "A scheduled eye-drop reminder is due."
+            title: settings.language === "es" ? "Recordatorio de ClearCue" : "ClearCue reminder",
+            body: settings.hideNotificationDetails
+              ? settings.language === "es"
+                ? "Un recordatorio programado de gotas está pendiente."
+                : "A scheduled eye-drop reminder is due."
+              : settings.language === "es"
+                ? "Tu recordatorio de gotas pospuesto está pendiente."
                 : "Your snoozed eye-drop reminder is due.",
               sound: "default",
               categoryIdentifier: DOSE_REMINDER_CATEGORY,
@@ -1291,7 +1313,7 @@ export default function App() {
         .then((response) => response && handleNotificationResponse(response))
         .catch(() => undefined);
     return () => subscription.remove();
-  }, [demoMode, doses, hydrated, settings.hideNotificationDetails]);
+  }, [demoMode, doses, hydrated, settings.hideNotificationDetails, settings.language]);
   const complete = doses.filter((dose) => dose.completed).length;
   const percentage = doses.length
     ? Math.round((complete / doses.length) * 100)
@@ -1622,8 +1644,12 @@ export default function App() {
     if (reminderUpdateInProgress.current) return;
     if (demoMode) {
       Alert.alert(
-        "Demo notifications stay off",
-        "Demo Mode never schedules real notifications. Turn off Demo Mode to use reminders for your own routine.",
+        settings.language === "es"
+          ? "Las notificaciones de demo permanecen desactivadas"
+          : "Demo notifications stay off",
+        settings.language === "es"
+          ? "El modo demo nunca programa notificaciones reales. Desactívalo para usar recordatorios para tu propia rutina."
+          : "Demo Mode never schedules real notifications. Turn off Demo Mode to use reminders for your own routine.",
       );
       return;
     }
@@ -1636,26 +1662,33 @@ export default function App() {
         });
       if (!permissions.granted) {
         Alert.alert(
-          "Notifications are off",
-          "To receive reminders, allow notifications for ClearCue in your iPhone Settings.",
+          settings.language === "es" ? "Las notificaciones están desactivadas" : "Notifications are off",
+          settings.language === "es"
+            ? "Para recibir recordatorios, permite las notificaciones de ClearCue en la configuración de tu iPhone."
+            : "To receive reminders, allow notifications for ClearCue in your iPhone Settings.",
         );
         return;
       }
       const scheduled = await scheduleReminders(
         doses,
         settings.hideNotificationDetails,
+        settings.language,
       );
       setRemindersEnabled(true);
       setRemindersNeedRefresh(false);
       void checkReminders();
       Alert.alert(
-        "Daily reminders are on",
-        `${scheduled} reminder${scheduled === 1 ? "" : "s"} will appear at the scheduled times.`,
+        settings.language === "es" ? "Los recordatorios diarios están activados" : "Daily reminders are on",
+        settings.language === "es"
+          ? `${scheduled} recordatorio${scheduled === 1 ? "" : "s"} aparecerá${scheduled === 1 ? "" : "n"} a las horas programadas.`
+          : `${scheduled} reminder${scheduled === 1 ? "" : "s"} will appear at the scheduled times.`,
       );
     } catch {
       Alert.alert(
-        "Could not refresh reminders",
-        "Your routine is still saved. Try Refresh again after reopening ClearCue.",
+        settings.language === "es" ? "No se pudieron actualizar los recordatorios" : "Could not refresh reminders",
+        settings.language === "es"
+          ? "Tu rutina sigue guardada. Intenta actualizar de nuevo después de volver a abrir ClearCue."
+          : "Your routine is still saved. Try Refresh again after reopening ClearCue.",
       );
     } finally {
       reminderUpdateInProgress.current = false;
@@ -1784,7 +1817,9 @@ export default function App() {
       }
     } catch {
       setDemoModeNotice(
-        "ClearCue could not switch modes. Your current routine is unchanged; close and reopen the app, then try again.",
+        settings.language === "es"
+          ? "ClearCue no pudo cambiar de modo. Tu rutina actual no cambió; cierra y vuelve a abrir la app, luego inténtalo de nuevo."
+          : "ClearCue could not switch modes. Your current routine is unchanged; close and reopen the app, then try again.",
       );
     } finally {
       demoTransitionInProgress.current = false;
@@ -1893,8 +1928,8 @@ export default function App() {
             <View style={styles.headerActions}>
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="How to use eye drops guide"
-                accessibilityHint="Opens a clinician-safe step-by-step guide"
+                accessibilityLabel={settings.language === "es" ? "Guía sobre cómo usar gotas" : "How to use eye drops guide"}
+                accessibilityHint={settings.language === "es" ? "Abre una guía paso a paso segura según el profesional" : "Opens a clinician-safe step-by-step guide"}
                 onPress={() => setGuideOpen(true)}
                 style={styles.help}
               >
@@ -2084,7 +2119,7 @@ export default function App() {
           style={styles.addButton}
           onPress={startAddingDose}
           accessibilityLabel={copy.add}
-          accessibilityHint="Opens a form to add an eye-drop reminder"
+          accessibilityHint={settings.language === "es" ? "Abre un formulario para añadir un recordatorio de gotas" : "Opens a form to add an eye-drop reminder"}
         >
           <Text style={styles.addPlus}>＋</Text>
           <Text style={[styles.addText, scaleText]}>{copy.add}</Text>
@@ -2225,7 +2260,7 @@ export default function App() {
         <Animated.View
           pointerEvents="none"
           accessible
-          accessibilityLabel="ClearCue is loading"
+          accessibilityLabel={settings.language === "es" ? "ClearCue se está cargando" : "ClearCue is loading"}
           style={[extraStyles.splashScreen, { opacity: splashOpacity }]}
         >
           <Image
@@ -2241,6 +2276,7 @@ export default function App() {
       <DoctorReportModal
         visible={reportOpen}
         animation={settings.reduceMotion ? "none" : "slide"}
+        language={settings.language}
         days={reportDays}
         data={reportData}
         onDays={setReportDays}
@@ -2249,6 +2285,7 @@ export default function App() {
       <DoseHistoryModal
         visible={historyDose !== null}
         animation={settings.reduceMotion ? "none" : "slide"}
+        language={settings.language}
         dose={historyDose}
         history={history}
         trackingStart={trackingStart}
@@ -2303,6 +2340,7 @@ export default function App() {
       <DropGuideModal
         visible={guideOpen}
         animation={settings.reduceMotion ? "none" : "slide"}
+        language={settings.language}
         onClose={() => setGuideOpen(false)}
       />
       <AppLockModal
@@ -2317,6 +2355,7 @@ export default function App() {
       <OnboardingModal
         visible={onboardingVisible}
         animation={settings.reduceMotion ? "none" : "slide"}
+        language={settings.language}
         step={onboardingStep}
         onNext={() => setOnboardingStep((current) => Math.min(current + 1, 2))}
         onComplete={() => {
@@ -2532,7 +2571,7 @@ function DoseCard({
   return (
     <View
       accessible
-      accessibilityLabel={`${dose.name}, ${dose.eye}, ${colorName} label, ${doses.length} scheduled reminder${doses.length === 1 ? "" : "s"}${estimateText ? `, ${estimateText}` : ""}`}
+      accessibilityLabel={`${dose.name}, ${localizedEye(dose.eye, language)}, ${language === "es" ? "etiqueta" : "label"} ${colorName}, ${doses.length} ${language === "es" ? `recordatorio${doses.length === 1 ? "" : "s"} programado${doses.length === 1 ? "" : "s"}` : `scheduled reminder${doses.length === 1 ? "" : "s"}`}${estimateText ? `, ${estimateText}` : ""}`}
       style={[
         extraStyles.medicationCard,
         doses.every((item) => item.completed) && extraStyles.completedMedicationCard,
@@ -2607,7 +2646,7 @@ function DoseCard({
                 <View style={extraStyles.cardLinks}>
                   <Pressable
                     accessibilityRole="button"
-                    accessibilityLabel={`View ${dose.name} history for ${scheduledDose.time}`}
+                    accessibilityLabel={language === "es" ? `Ver historial de ${dose.name} para las ${scheduledDose.time}` : `View ${dose.name} history for ${scheduledDose.time}`}
                     onPress={() => onHistory(scheduledDose.id)}
                   >
                     <Text style={extraStyles.cardLink}>
@@ -2616,8 +2655,8 @@ function DoseCard({
                   </Pressable>
                   <Pressable
                     accessibilityRole="button"
-                    accessibilityLabel={`${state === "completed" ? "Mark incomplete" : "Mark as taken"}: ${dose.name} at ${scheduledDose.time}`}
-                    accessibilityHint="Records this dose in adherence history"
+                    accessibilityLabel={language === "es" ? `${state === "completed" ? "Marcar como no tomada" : "Marcar como tomada"}: ${dose.name} a las ${scheduledDose.time}` : `${state === "completed" ? "Mark incomplete" : "Mark as taken"}: ${dose.name} at ${scheduledDose.time}`}
+                    accessibilityHint={language === "es" ? "Registra esta dosis en el historial de seguimiento" : "Records this dose in adherence history"}
                     onPress={() => onToggle(scheduledDose.id)}
                     style={[styles.doneButton, state === "completed" && styles.checkedButton]}
                   >
@@ -2667,7 +2706,7 @@ function DoseCard({
           <View style={extraStyles.cardLinks}>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={`Edit ${dose.name}`}
+              accessibilityLabel={language === "es" ? `Editar ${dose.name}` : `Edit ${dose.name}`}
               onPress={onEdit}
             >
               <Text style={extraStyles.cardLink}>{language === "es" ? "Editar" : "Edit"}</Text>
@@ -2950,6 +2989,7 @@ function Legend({ color, label }: { color: string; label: string }) {
 function DoctorReportModal({
   visible,
   animation,
+  language,
   days,
   data,
   onDays,
@@ -2957,11 +2997,13 @@ function DoctorReportModal({
 }: {
   visible: boolean;
   animation: "none" | "slide";
+  language: "en" | "es";
   days: 7 | 30;
   data: AdherenceData;
   onDays: (days: 7 | 30) => void;
   onClose: () => void;
 }) {
+  const spanish = language === "es";
   const overall = data.expected
     ? Math.round(((data.taken + data.late) / data.expected) * 100)
     : 0;
@@ -2971,10 +3013,13 @@ function DoctorReportModal({
   const end = new Date();
   const start = new Date(end);
   start.setDate(start.getDate() - (days - 1));
-  const range = `${start.toLocaleDateString("en-US", { month: "short", day: "numeric" })} – ${end.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`;
+  const locale = spanish ? "es-US" : "en-US";
+  const range = `${start.toLocaleDateString(locale, { month: "short", day: "numeric" })} – ${end.toLocaleDateString(locale, { month: "short", day: "numeric", year: "numeric" })}`;
   async function shareReport() {
     await Share.share({
-      message: `ClearCue self-reported routine summary\nPeriod: ${range}\nRecorded doses: ${overall}%\nMarked on time: ${onTime}%\nMissed doses: ${data.missed}\nLate doses: ${data.late}\nPattern: ${data.insight}\n\nThis summary reflects doses the user marked in ClearCue. It does not verify administration, treatment effectiveness, or clinical adherence.`,
+      message: spanish
+        ? `Resumen autoinformado de rutina de ClearCue\nPeriodo: ${range}\nDosis registradas: ${overall}%\nMarcadas a tiempo: ${onTime}%\nDosis no registradas: ${data.missed}\nDosis tardías: ${data.late}\nPatrón: ${data.insight}\n\nEste resumen refleja las dosis que la persona marcó en ClearCue. No verifica la administración, eficacia del tratamiento ni adherencia clínica.`
+        : `ClearCue self-reported routine summary\nPeriod: ${range}\nRecorded doses: ${overall}%\nMarked on time: ${onTime}%\nMissed doses: ${data.missed}\nLate doses: ${data.late}\nPattern: ${data.insight}\n\nThis summary reflects doses the user marked in ClearCue. It does not verify administration, treatment effectiveness, or clinical adherence.`,
     });
   }
   return (
@@ -2987,12 +3032,12 @@ function DoctorReportModal({
       <SafeAreaView style={styles.modalScreen}>
         <View style={styles.modalHeader}>
           <View>
-            <Text style={styles.sectionLabel}>PATIENT SUMMARY</Text>
-            <Text style={styles.modalTitle}>Shareable report</Text>
+            <Text style={styles.sectionLabel}>{spanish ? "RESUMEN DEL PACIENTE" : "PATIENT SUMMARY"}</Text>
+            <Text style={styles.modalTitle}>{spanish ? "Informe para compartir" : "Shareable report"}</Text>
           </View>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Close shareable report"
+            accessibilityLabel={spanish ? "Cerrar informe para compartir" : "Close shareable report"}
             style={styles.close}
             onPress={onClose}
           >
@@ -3004,7 +3049,7 @@ function DoctorReportModal({
             {([7, 30] as const).map((period) => (
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel={`Show last ${period} days`}
+                accessibilityLabel={spanish ? "Mostrar los últimos " + period + " días" : `Show last ${period} days`}
                 key={period}
                 onPress={() => onDays(period)}
                 style={[
@@ -3018,21 +3063,21 @@ function DoctorReportModal({
                     days === period && styles.periodTextSelected,
                   ]}
                 >
-                  Last {period} days
+                  {spanish ? `Últimos ${period} días` : `Last ${period} days`}
                 </Text>
               </Pressable>
             ))}
           </View>
           <View style={styles.reportCard}>
-            <Text style={styles.reportBrand}>CLEARCUE SELF-REPORTED SUMMARY</Text>
+            <Text style={styles.reportBrand}>{spanish ? "RESUMEN AUTOINFORMADO DE CLEARCUE" : "CLEARCUE SELF-REPORTED SUMMARY"}</Text>
             <Text style={styles.reportRange}>{range}</Text>
             <View style={styles.reportMetricGrid}>
-              <ReportMetric value={`${overall}%`} label="Recorded doses" />
-              <ReportMetric value={`${onTime}%`} label="Marked on time" />
-              <ReportMetric value={String(data.missed)} label="Missed doses" />
-              <ReportMetric value={String(data.late)} label="Late doses" />
+              <ReportMetric value={`${overall}%`} label={spanish ? "Dosis registradas" : "Recorded doses"} />
+              <ReportMetric value={`${onTime}%`} label={spanish ? "Marcadas a tiempo" : "Marked on time"} />
+              <ReportMetric value={String(data.missed)} label={spanish ? "Dosis no registradas" : "Missed doses"} />
+              <ReportMetric value={String(data.late)} label={spanish ? "Dosis tardías" : "Late doses"} />
             </View>
-            <Text style={styles.reportHeading}>Recorded medication activity</Text>
+            <Text style={styles.reportHeading}>{spanish ? "Actividad de medicamentos registrada" : "Recorded medication activity"}</Text>
             {data.byMedication.map((medication) => (
               <View key={medication.name} style={styles.reportMedication}>
                 <Text style={styles.reportMedicationName}>
@@ -3045,21 +3090,20 @@ function DoctorReportModal({
               </View>
             ))}
             <View style={styles.reportPattern}>
-              <Text style={styles.insightEyebrow}>MOST MISSED PATTERN</Text>
+              <Text style={styles.insightEyebrow}>{spanish ? "PATRÓN CON MÁS OMISIONES" : "MOST MISSED PATTERN"}</Text>
               <Text style={styles.insightText}>{data.insight}</Text>
             </View>
             <Text style={styles.reportDisclaimer}>
-              This reflects doses the user marked in ClearCue. It does not prove
-              administration, treatment effectiveness, or clinical adherence.
+              {spanish ? "Esto refleja las dosis que la persona marcó en ClearCue. No prueba la administración, eficacia del tratamiento ni adherencia clínica." : "This reflects doses the user marked in ClearCue. It does not prove administration, treatment effectiveness, or clinical adherence."}
             </Text>
           </View>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Share read-only report"
+            accessibilityLabel={spanish ? "Compartir informe de solo lectura" : "Share read-only report"}
             onPress={() => void shareReport()}
             style={styles.saveButton}
           >
-            <Text style={styles.saveText}>Share read-only report</Text>
+            <Text style={styles.saveText}>{spanish ? "Compartir informe de solo lectura" : "Share read-only report"}</Text>
           </Pressable>
         </ScrollView>
       </SafeAreaView>
@@ -3069,6 +3113,7 @@ function DoctorReportModal({
 function DoseHistoryModal({
   visible,
   animation,
+  language,
   dose,
   history,
   trackingStart,
@@ -3076,12 +3121,15 @@ function DoseHistoryModal({
 }: {
   visible: boolean;
   animation: "none" | "slide";
+  language: "en" | "es";
   dose: Dose | null;
   history: DoseLog[];
   trackingStart: string;
   onClose: () => void;
 }) {
   if (!dose) return null;
+  const spanish = language === "es";
+  const locale = spanish ? "es-US" : "en-US";
   const now = new Date();
   const entries = Array.from({ length: 14 }, (_, index) => {
     const day = new Date(now);
@@ -3101,14 +3149,14 @@ function DoseHistoryModal({
           : "missed");
     return {
       date,
-      label: day.toLocaleDateString("en-US", {
+      label: day.toLocaleDateString(locale, {
         weekday: "short",
         month: "short",
         day: "numeric",
       }),
       status,
       recordedAt: log?.completedAt
-        ? new Date(log.completedAt).toLocaleTimeString("en-US", {
+        ? new Date(log.completedAt).toLocaleTimeString(locale, {
             hour: "numeric",
             minute: "2-digit",
           })
@@ -3125,16 +3173,16 @@ function DoseHistoryModal({
           : { color: "#6F625B", backgroundColor: "#F2EBE4" };
   const statusLabel = (status: string) =>
     status === "taken"
-      ? "On time"
+      ? spanish ? "A tiempo" : "On time"
       : status === "late"
-        ? "Late"
+        ? spanish ? "Tardía" : "Late"
         : status === "skipped"
-          ? "Skipped"
+          ? spanish ? "Omitida" : "Skipped"
         : status === "missed"
-          ? "Missed"
-          : status === "upcoming"
-            ? "Upcoming"
-            : "Not tracked";
+          ? spanish ? "No registrada" : "Missed"
+        : status === "upcoming"
+            ? spanish ? "Próxima" : "Upcoming"
+            : spanish ? "Sin seguimiento" : "Not tracked";
   return (
     <Modal
       visible={visible}
@@ -3145,12 +3193,12 @@ function DoseHistoryModal({
       <SafeAreaView style={styles.modalScreen}>
         <View style={styles.modalHeader}>
           <View>
-            <Text style={styles.sectionLabel}>LAST 14 DAYS</Text>
-            <Text style={styles.modalTitle}>{dose.name} history</Text>
+            <Text style={styles.sectionLabel}>{spanish ? "ÚLTIMOS 14 DÍAS" : "LAST 14 DAYS"}</Text>
+            <Text style={styles.modalTitle}>{dose.name} {spanish ? "historial" : "history"}</Text>
           </View>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Close dose history"
+            accessibilityLabel={spanish ? "Cerrar historial de dosis" : "Close dose history"}
             style={styles.close}
             onPress={onClose}
           >
@@ -3159,27 +3207,26 @@ function DoseHistoryModal({
         </View>
         <ScrollView contentContainerStyle={styles.form}>
           <View style={styles.note}>
-            <Text style={styles.noteTitle}>Recorded activity</Text>
+            <Text style={styles.noteTitle}>{spanish ? "Actividad registrada" : "Recorded activity"}</Text>
             <Text style={styles.noteText}>
-              This history reflects doses marked in ClearCue. A “missed” entry
-              can also mean the dose was not recorded.
+              {spanish ? "Este historial refleja las dosis marcadas en ClearCue. Una entrada de dosis no registrada también puede significar que no se registró la dosis." : "This history reflects doses marked in ClearCue. A “missed” entry can also mean the dose was not recorded."}
             </Text>
           </View>
           {entries.map((entry) => (
             <View
               key={entry.date}
               accessible
-              accessibilityLabel={`${entry.label}: ${statusLabel(entry.status)}${entry.recordedAt ? `, recorded ${entry.recordedAt}` : ""}`}
+              accessibilityLabel={`${entry.label}: ${statusLabel(entry.status)}${entry.recordedAt ? spanish ? `, registrada ${entry.recordedAt}` : `, recorded ${entry.recordedAt}` : ""}`}
               style={extraStyles.historyRow}
             >
               <View>
                 <Text style={extraStyles.historyDate}>{entry.label}</Text>
                 <Text style={extraStyles.historyTime}>
                   {entry.recordedAt
-                    ? `Recorded ${entry.recordedAt}`
+                    ? spanish ? `Registrada ${entry.recordedAt}` : `Recorded ${entry.recordedAt}`
                     : entry.status === "upcoming"
-                      ? `Scheduled ${dose.time}`
-                      : "No recorded dose"}
+                      ? spanish ? `Programada ${dose.time}` : `Scheduled ${dose.time}`
+                      : spanish ? "Sin dosis registrada" : "No recorded dose"}
                 </Text>
               </View>
               <View
@@ -3297,12 +3344,12 @@ function PrivacyModal({
       <SafeAreaView style={styles.modalScreen}>
         <View style={styles.modalHeader}>
           <View>
-            <Text style={styles.sectionLabel}>YOUR DATA</Text>
-            <Text style={styles.modalTitle}>Privacy & data</Text>
+            <Text style={styles.sectionLabel}>{spanish ? "TUS DATOS" : "YOUR DATA"}</Text>
+            <Text style={styles.modalTitle}>{spanish ? "Privacidad y datos" : "Privacy & data"}</Text>
           </View>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Close privacy and data controls"
+            accessibilityLabel={spanish ? "Cerrar controles de privacidad y datos" : "Close privacy and data controls"}
             style={styles.close}
             onPress={onClose}
           >
@@ -3311,16 +3358,14 @@ function PrivacyModal({
         </View>
         <ScrollView contentContainerStyle={styles.form}>
           <View style={styles.note}>
-            <Text style={styles.noteTitle}>Local by default</Text>
+            <Text style={styles.noteTitle}>{spanish ? "Local por defecto" : "Local by default"}</Text>
             <Text style={styles.noteText}>
-              ClearCue stores your routine, medication details, and adherence
-              history on this device. It has no ClearCue account, cloud sync, or
-              caregiver monitoring.
+              {spanish ? "ClearCue guarda tu rutina, detalles de medicamentos e historial de seguimiento en este dispositivo. No tiene cuenta de ClearCue, sincronización en la nube ni monitoreo de cuidadores." : "ClearCue stores your routine, medication details, and adherence history on this device. It has no ClearCue account, cloud sync, or caregiver monitoring."}
             </Text>
           </View>
           <SettingRow
-            title="Hide medication details in notifications"
-            detail="Use general wording on lock-screen reminders and refill-estimate alerts."
+            title={spanish ? "Ocultar detalles de medicamentos en notificaciones" : "Hide medication details in notifications"}
+            detail={spanish ? "Usa texto general en recordatorios de pantalla bloqueada y alertas de estimación de reposición." : "Use general wording on lock-screen reminders and refill-estimate alerts."}
             value={hideNotificationDetails}
             onChange={onHideNotificationDetails}
           />
@@ -3344,53 +3389,50 @@ function PrivacyModal({
               : "Face ID requires a ClearCue development or TestFlight build on an iPhone; it cannot be fully tested in Expo Go."}
           </Text>
           <View style={styles.note}>
-            <Text style={styles.noteTitle}>Sharing stays in your control</Text>
+            <Text style={styles.noteTitle}>{spanish ? "Compartir permanece bajo tu control" : "Sharing stays in your control"}</Text>
             <Text style={styles.noteText}>
-              A shareable report is created only when you choose Share read-only
-              report. Review the destination before sending it.
+              {spanish ? "Un informe para compartir se crea solo cuando eliges Compartir informe de solo lectura. Revisa el destino antes de enviarlo." : "A shareable report is created only when you choose Share read-only report. Review the destination before sending it."}
             </Text>
           </View>
           <View style={extraStyles.eraseSection}>
-            <Text style={extraStyles.eraseTitle}>Erase local routine data</Text>
+            <Text style={extraStyles.eraseTitle}>{spanish ? "Borrar datos locales de la rutina" : "Erase local routine data"}</Text>
             <Text style={extraStyles.eraseText}>
-              This removes your medications, private prescription details,
-              dose history, and scheduled ClearCue notifications from this
-              device. It cannot be undone.
+              {spanish ? "Esto elimina tus medicamentos, detalles privados de receta, historial de dosis y notificaciones programadas de ClearCue de este dispositivo. No se puede deshacer." : "This removes your medications, private prescription details, dose history, and scheduled ClearCue notifications from this device. It cannot be undone."}
             </Text>
             {eraseConfirming ? (
               <View style={extraStyles.deleteConfirm}>
-                <Text style={extraStyles.eraseTitle}>Erase all routine data?</Text>
+                <Text style={extraStyles.eraseTitle}>{spanish ? "¿Borrar todos los datos de la rutina?" : "Erase all routine data?"}</Text>
                 <Text style={extraStyles.eraseText}>
-                  This cannot be undone. Accessibility settings will stay on this device.
+                  {spanish ? "No se puede deshacer. Los ajustes de accesibilidad permanecerán en este dispositivo." : "This cannot be undone. Accessibility settings will stay on this device."}
                 </Text>
                 <View style={styles.choiceRow}>
                   <Pressable
                     accessibilityRole="button"
-                    accessibilityLabel="Keep local ClearCue routine data"
+                    accessibilityLabel={spanish ? "Conservar datos locales de la rutina de ClearCue" : "Keep local ClearCue routine data"}
                     onPress={() => setEraseConfirming(false)}
                     style={styles.choice}
                   >
-                    <Text style={styles.choiceText}>Keep data</Text>
+                    <Text style={styles.choiceText}>{spanish ? "Conservar datos" : "Keep data"}</Text>
                   </Pressable>
                   <Pressable
                     accessibilityRole="button"
-                    accessibilityLabel="Confirm erasing local ClearCue routine data"
+                    accessibilityLabel={spanish ? "Confirmar borrado de datos locales de la rutina de ClearCue" : "Confirm erasing local ClearCue routine data"}
                     onPress={onErase}
                     style={extraStyles.deleteConfirmButton}
                   >
-                    <Text style={extraStyles.deleteConfirmButtonText}>Erase data</Text>
+                    <Text style={extraStyles.deleteConfirmButtonText}>{spanish ? "Borrar datos" : "Erase data"}</Text>
                   </Pressable>
                 </View>
               </View>
             ) : (
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="Erase local ClearCue routine data"
+                accessibilityLabel={spanish ? "Borrar datos locales de la rutina de ClearCue" : "Erase local ClearCue routine data"}
                 onPress={() => setEraseConfirming(true)}
                 style={extraStyles.eraseButton}
               >
                 <Text style={extraStyles.eraseButtonText}>
-                  Erase my routine data
+                  {spanish ? "Borrar los datos de mi rutina" : "Erase my routine data"}
                 </Text>
               </Pressable>
             )}
@@ -3568,13 +3610,23 @@ function SettingsModal({
 function DropGuideModal({
   visible,
   animation,
+  language,
   onClose,
 }: {
   visible: boolean;
   animation: "none" | "slide";
+  language: "en" | "es";
   onClose: () => void;
 }) {
-  const steps = [
+  const spanish = language === "es";
+  const steps = spanish ? [
+    ["Revisa primero", "Lee la etiqueta de la receta. Usa el medicamento exacto, el ojo y la cantidad de gotas que indicó tu profesional. No cambies el plan en ClearCue."],
+    ["Lávate las manos", "Lávate las manos con agua y jabón antes de tocar el frasco o el área de los ojos."],
+    ["Mantén limpia la punta", "Revisa que la punta del frasco esté intacta. No dejes que toque tus manos, ojo, párpado, pestañas ni ninguna superficie."],
+    ["Haz un bolsillo", "Inclina la cabeza hacia atrás y mira arriba. Baja suavemente el párpado inferior para formar un pequeño bolsillo."],
+    ["Coloca la gota", "Sostén la punta del frasco justo sobre el bolsillo sin tocarlo. Coloca la cantidad de gotas recetada."],
+    ["Cierra y espera", "Cierra el ojo. Presiona suavemente la esquina interna cerca de la nariz durante al menos 1 minuto si tu profesional no indicó otra cosa. Para diferentes gotas, espera al menos 5 minutos entre ellas. Vuelve a colocar la tapa sin limpiar la punta."],
+  ] : [
     [
       "Check first",
       "Read the prescription label. Use the exact medication, eye, and number of drops your clinician instructed. Do not change the plan in ClearCue.",
@@ -3610,12 +3662,12 @@ function DropGuideModal({
       <SafeAreaView style={styles.modalScreen}>
         <View style={styles.modalHeader}>
           <View>
-            <Text style={styles.sectionLabel}>ACCESSIBILITY GUIDE</Text>
-            <Text style={styles.modalTitle}>How to use drops</Text>
+            <Text style={styles.sectionLabel}>{spanish ? "GUÍA DE ACCESIBILIDAD" : "ACCESSIBILITY GUIDE"}</Text>
+            <Text style={styles.modalTitle}>{spanish ? "Cómo usar gotas" : "How to use drops"}</Text>
           </View>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Close how to use drops guide"
+            accessibilityLabel={spanish ? "Cerrar guía sobre cómo usar gotas" : "Close how to use drops guide"}
             style={styles.close}
             onPress={onClose}
           >
@@ -3625,21 +3677,17 @@ function DropGuideModal({
         <ScrollView contentContainerStyle={styles.form}>
           <View style={styles.note}>
             <Text style={styles.noteTitle}>
-              Follow your clinician’s plan first
+              {spanish ? "Sigue primero el plan de tu profesional" : "Follow your clinician’s plan first"}
             </Text>
             <Text style={styles.noteText}>
-              These general steps are based on National Eye Institute patient
-              guidance. Your bottle label or clinician may give different
-              instructions—for example about shaking, contact lenses, storage,
-              or discarding the bottle. For urgent symptoms, follow your
-              clinician’s emergency instructions or local emergency guidance.
+              {spanish ? "Estos pasos generales se basan en la guía para pacientes del National Eye Institute. La etiqueta de tu frasco o tu profesional puede indicar algo diferente, por ejemplo, agitar, lentes de contacto, almacenamiento o desechar el frasco. Para síntomas urgentes, sigue las instrucciones de emergencia de tu profesional o la orientación local de emergencia." : "These general steps are based on National Eye Institute patient guidance. Your bottle label or clinician may give different instructions—for example about shaking, contact lenses, storage, or discarding the bottle. For urgent symptoms, follow your clinician’s emergency instructions or local emergency guidance."}
             </Text>
           </View>
           {steps.map(([title, detail], index) => (
             <View
               key={title}
               accessible
-              accessibilityLabel={`Step ${index + 1} of ${steps.length}: ${title}. ${detail}`}
+              accessibilityLabel={spanish ? `Paso ${index + 1} de ${steps.length}: ${title}. ${detail}` : `Step ${index + 1} of ${steps.length}: ${title}. ${detail}`}
               style={extraStyles.guideStep}
             >
               <View style={extraStyles.guideNumber}>
@@ -3652,16 +3700,15 @@ function DropGuideModal({
             </View>
           ))}
           <Text style={extraStyles.guideSource}>
-            Source: National Eye Institute, “How to Put in Eye Drops,” reviewed
-            September 2026.
+            {spanish ? "Fuente: National Eye Institute, “How to Put in Eye Drops”, revisado en septiembre de 2026." : "Source: National Eye Institute, “How to Put in Eye Drops,” reviewed September 2026."}
           </Text>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Done reading how to use drops guide"
+            accessibilityLabel={spanish ? "Terminar de leer la guía sobre cómo usar gotas" : "Done reading how to use drops guide"}
             onPress={onClose}
             style={styles.saveButton}
           >
-            <Text style={styles.saveText}>Done</Text>
+            <Text style={styles.saveText}>{spanish ? "Listo" : "Done"}</Text>
           </Pressable>
         </ScrollView>
       </SafeAreaView>
@@ -3671,17 +3718,24 @@ function DropGuideModal({
 function OnboardingModal({
   visible,
   animation,
+  language,
   step,
   onNext,
   onComplete,
 }: {
   visible: boolean;
   animation: "none" | "slide";
+  language: "en" | "es";
   step: number;
   onNext: () => void;
   onComplete: () => void;
 }) {
-  const screens = [
+  const spanish = language === "es";
+  const screens = spanish ? [
+    { eyebrow: "BIENVENIDO A CLEARCUE", title: "Rutinas más claras, una gota a la vez.", body: "Mantén recordatorios de gotas, progreso diario y un resumen simple del paciente juntos en tu teléfono." },
+    { eyebrow: "TU ATENCIÓN ES LO PRIMERO", title: "ClearCue apoya el plan de tu profesional.", body: "No diagnostica, receta, cambia tu dosis ni reemplaza las instrucciones de tu profesional o la etiqueta de la receta." },
+    { eyebrow: "PRIVADO POR DEFECTO", title: "Tú mantienes el control.", body: "Tu rutina se guarda en este dispositivo. Tú eliges si usar recordatorios y cuándo compartir un informe generado por el paciente." },
+  ] : [
     {
       eyebrow: "WELCOME TO CLEARCUE",
       title: "Clearer routines, one drop at a time.",
@@ -3731,24 +3785,24 @@ function OnboardingModal({
             accessibilityRole="button"
             accessibilityLabel={
               step === screens.length - 1
-                ? "Get started with ClearCue"
-                : "Continue onboarding"
+                ? spanish ? "Comenzar con ClearCue" : "Get started with ClearCue"
+                : spanish ? "Continuar bienvenida" : "Continue onboarding"
             }
             onPress={step === screens.length - 1 ? onComplete : onNext}
             style={styles.saveButton}
           >
             <Text style={styles.saveText}>
-              {step === screens.length - 1 ? "Get started" : "Continue"}
+              {step === screens.length - 1 ? (spanish ? "Comenzar" : "Get started") : (spanish ? "Continuar" : "Continue")}
             </Text>
           </Pressable>
           {step < screens.length - 1 && (
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Skip onboarding"
+              accessibilityLabel={spanish ? "Omitir bienvenida" : "Skip onboarding"}
               onPress={onComplete}
               style={extraStyles.onboardingSkip}
             >
-              <Text style={styles.history}>Skip for now</Text>
+              <Text style={styles.history}>{spanish ? "Omitir por ahora" : "Skip for now"}</Text>
             </Pressable>
           )}
         </View>
@@ -3860,7 +3914,7 @@ function RoutineReviewModal({ visible, animation, name, eye, times, clinicianIns
           : "The bottle-opened date is more than a year ago. Confirm that it is still the correct bottle and date.",
       );
   }
-  return <Modal visible={visible} animationType={animation} presentationStyle="pageSheet" onRequestClose={onBack} onDismiss={onDismiss}><SafeAreaView style={styles.modalScreen}><View style={styles.modalHeader}><View><Text style={styles.sectionLabel}>{spanish ? "REVISAR RUTINA" : "REVIEW ROUTINE"}</Text><Text style={styles.modalTitle}>{spanish ? "Revisa antes de guardar" : "Check before saving"}</Text></View><Pressable accessibilityRole="button" accessibilityLabel={spanish ? "Volver a editar la rutina" : "Return to routine editing"} onPress={onBack} style={styles.close}><Text style={styles.closeText}>×</Text></Pressable></View><ScrollView contentContainerStyle={styles.form}><View style={styles.note}><Text style={styles.noteTitle}>{spanish ? "ClearCue apoya tu plan" : "ClearCue supports your plan"}</Text><Text style={styles.noteText}>{spanish ? "ClearCue no diagnostica, receta, valida un plan de tratamiento clínico ni reemplaza las instrucciones de tu profesional o la etiqueta de la receta." : "ClearCue does not diagnose, prescribe, validate a clinical treatment plan, or replace your clinician’s instructions or prescription label."}</Text></View><View style={extraStyles.detailsSection}><Text style={styles.fieldLabel}>{name}</Text><Text style={extraStyles.supplyHelp}>{eye} · {times.join(" · ")}</Text>{clinicianInstructions ? <Text style={extraStyles.supplyHelp}>{spanish ? "Instrucciones del profesional: " : "Clinician instructions: "}{clinicianInstructions}</Text> : null}{bottleMl ? <Text style={extraStyles.supplyHelp}>{spanish ? "Estimación de suministro: " : "Supply estimate: "}{bottleMl} mL · {dropsPerApplication} {spanish ? `gota${Number(dropsPerApplication) === 1 ? "" : "s"} por uso` : `drop${Number(dropsPerApplication) === 1 ? "" : "s"} each use`} · {applicationsPerDay} {spanish ? `uso${Number(applicationsPerDay) === 1 ? "" : "s"} al día` : `use${Number(applicationsPerDay) === 1 ? "" : "s"} daily`} · {spanish ? "abierto " : "opened "}{openedOn} · {spanish ? `aviso ${warningDays} días antes de la estimación` : `warning ${warningDays} days before estimate`}</Text> : <Text style={extraStyles.supplyHelp}>{spanish ? "No se agregó estimación de suministro." : "No supply estimate added."}</Text>}</View>{warnings.map((warning) => <View key={warning} style={extraStyles.eraseSection}><Text style={extraStyles.eraseTitle}>{spanish ? "Revisa este detalle" : "Review this detail"}</Text><Text style={extraStyles.eraseText}>{warning}</Text></View>)}<Pressable accessibilityRole="checkbox" accessibilityState={{ checked: confirmed }} accessibilityLabel={spanish ? "Confirmo que revisé estos valores con la receta de mi profesional" : "I checked these values against my clinician's prescription"} onPress={() => onConfirmed(!confirmed)} style={[styles.choice, confirmed && styles.choiceSelected]}><Text style={[styles.choiceText, confirmed && styles.choiceTextSelected]}>{confirmed ? "✓ " : ""}{spanish ? "Confirmo que revisé estos valores con la receta de mi profesional." : "I checked these values against my clinician’s prescription."}</Text></Pressable><Pressable accessibilityRole="button" accessibilityState={{ disabled: !confirmed }} accessibilityLabel={spanish ? "Guardar rutina de gotas revisada" : "Save reviewed eye drop routine"} disabled={!confirmed} onPress={onSave} style={[styles.saveButton, !confirmed && { opacity: 0.45 }]}><Text style={styles.saveText}>{spanish ? "Guardar rutina" : "Save routine"}</Text></Pressable><Pressable accessibilityRole="button" accessibilityLabel={spanish ? "Volver a editar la rutina" : "Return to routine editing"} onPress={onBack} style={extraStyles.emptyGuide}><Text style={extraStyles.cardLink}>{spanish ? "Volver y editar" : "Go back and edit"}</Text></Pressable></ScrollView></SafeAreaView></Modal>;
+  return <Modal visible={visible} animationType={animation} presentationStyle="pageSheet" onRequestClose={onBack} onDismiss={onDismiss}><SafeAreaView style={styles.modalScreen}><View style={styles.modalHeader}><View><Text style={styles.sectionLabel}>{spanish ? "REVISAR RUTINA" : "REVIEW ROUTINE"}</Text><Text style={styles.modalTitle}>{spanish ? "Revisa antes de guardar" : "Check before saving"}</Text></View><Pressable accessibilityRole="button" accessibilityLabel={spanish ? "Volver a editar la rutina" : "Return to routine editing"} onPress={onBack} style={styles.close}><Text style={styles.closeText}>×</Text></Pressable></View><ScrollView contentContainerStyle={styles.form}><View style={styles.note}><Text style={styles.noteTitle}>{spanish ? "ClearCue apoya tu plan" : "ClearCue supports your plan"}</Text><Text style={styles.noteText}>{spanish ? "ClearCue no diagnostica, receta, valida un plan de tratamiento clínico ni reemplaza las instrucciones de tu profesional o la etiqueta de la receta." : "ClearCue does not diagnose, prescribe, validate a clinical treatment plan, or replace your clinician’s instructions or prescription label."}</Text></View><View style={extraStyles.detailsSection}><Text style={styles.fieldLabel}>{name}</Text><Text style={extraStyles.supplyHelp}>{localizedEye(eye, language)} · {times.join(" · ")}</Text>{clinicianInstructions ? <Text style={extraStyles.supplyHelp}>{spanish ? "Instrucciones del profesional: " : "Clinician instructions: "}{clinicianInstructions}</Text> : null}{bottleMl ? <Text style={extraStyles.supplyHelp}>{spanish ? "Estimación de suministro: " : "Supply estimate: "}{bottleMl} mL · {dropsPerApplication} {spanish ? `gota${Number(dropsPerApplication) === 1 ? "" : "s"} por uso` : `drop${Number(dropsPerApplication) === 1 ? "" : "s"} each use`} · {applicationsPerDay} {spanish ? `uso${Number(applicationsPerDay) === 1 ? "" : "s"} al día` : `use${Number(applicationsPerDay) === 1 ? "" : "s"} daily`} · {spanish ? "abierto " : "opened "}{openedOn} · {spanish ? `aviso ${warningDays} días antes de la estimación` : `warning ${warningDays} days before estimate`}</Text> : <Text style={extraStyles.supplyHelp}>{spanish ? "No se agregó estimación de suministro." : "No supply estimate added."}</Text>}</View>{warnings.map((warning) => <View key={warning} style={extraStyles.eraseSection}><Text style={extraStyles.eraseTitle}>{spanish ? "Revisa este detalle" : "Review this detail"}</Text><Text style={extraStyles.eraseText}>{warning}</Text></View>)}<Pressable accessibilityRole="checkbox" accessibilityState={{ checked: confirmed }} accessibilityLabel={spanish ? "Confirmo que revisé estos valores con la receta de mi profesional" : "I checked these values against my clinician's prescription"} onPress={() => onConfirmed(!confirmed)} style={[styles.choice, confirmed && styles.choiceSelected]}><Text style={[styles.choiceText, confirmed && styles.choiceTextSelected]}>{confirmed ? "✓ " : ""}{spanish ? "Confirmo que revisé estos valores con la receta de mi profesional." : "I checked these values against my clinician’s prescription."}</Text></Pressable><Pressable accessibilityRole="button" accessibilityState={{ disabled: !confirmed }} accessibilityLabel={spanish ? "Guardar rutina de gotas revisada" : "Save reviewed eye drop routine"} disabled={!confirmed} onPress={onSave} style={[styles.saveButton, !confirmed && { opacity: 0.45 }]}><Text style={styles.saveText}>{spanish ? "Guardar rutina" : "Save routine"}</Text></Pressable><Pressable accessibilityRole="button" accessibilityLabel={spanish ? "Volver a editar la rutina" : "Return to routine editing"} onPress={onBack} style={extraStyles.emptyGuide}><Text style={extraStyles.cardLink}>{spanish ? "Volver y editar" : "Go back and edit"}</Text></Pressable></ScrollView></SafeAreaView></Modal>;
 }
 function AddMedicationModal(props: ModalProps) {
   const spanish = props.language === "es";
@@ -4074,9 +4128,9 @@ function AddMedicationModal(props: ModalProps) {
               <Text style={{ fontSize: 10, color: "#6F625B", marginTop: 7 }}>
                 {props.selectedMedication.prescriptionStatus ??
                   (props.selectedMedication.id === "artificial-tears"
-                    ? "Over-the-counter"
-                    : "Prescription")}{" "}
-                reference · {props.selectedMedication.source} · reviewed{" "}
+                    ? spanish ? "Sin receta" : "Over-the-counter"
+                    : spanish ? "Con receta" : "Prescription")}{" "}
+                {spanish ? "referencia" : "reference"} · {props.selectedMedication.source} · {spanish ? "revisado" : "reviewed"}{" "}
                 {props.selectedMedication.reviewedOn}
               </Text>
               <Pressable
@@ -4201,7 +4255,7 @@ function AddMedicationModal(props: ModalProps) {
                 accessibilityLabel={spanish ? "Nombre del profesional que receta" : "Prescriber name"}
                 value={props.prescriber}
                 onChangeText={props.onPrescriber}
-                placeholder="e.g. Dr. Rivera"
+                placeholder={spanish ? "p. ej., Dra. Rivera" : "e.g. Dr. Rivera"}
                 placeholderTextColor="#81969A"
                 style={styles.input}
               />
@@ -4211,7 +4265,7 @@ function AddMedicationModal(props: ModalProps) {
                 accessibilityLabel={spanish ? "Teléfono del profesional" : "Prescriber phone number"}
                 value={props.prescriberPhone}
                 onChangeText={props.onPrescriberPhone}
-                placeholder="e.g. (555) 123-4567"
+                placeholder={spanish ? "p. ej., (555) 123-4567" : "e.g. (555) 123-4567"}
                 keyboardType="phone-pad"
                 autoComplete="tel"
                 maxLength={20}
@@ -4224,7 +4278,7 @@ function AddMedicationModal(props: ModalProps) {
                 accessibilityLabel={spanish ? "Nombre de la farmacia" : "Pharmacy name"}
                 value={props.pharmacy}
                 onChangeText={props.onPharmacy}
-                placeholder="e.g. Main Street Pharmacy"
+                placeholder={spanish ? "p. ej., Farmacia Central" : "e.g. Main Street Pharmacy"}
                 placeholderTextColor="#81969A"
                 style={styles.input}
               />
@@ -4234,7 +4288,7 @@ function AddMedicationModal(props: ModalProps) {
                 accessibilityLabel={spanish ? "Teléfono de la farmacia" : "Pharmacy phone number"}
                 value={props.pharmacyPhone}
                 onChangeText={props.onPharmacyPhone}
-                placeholder="e.g. (555) 123-4567"
+                placeholder={spanish ? "p. ej., (555) 123-4567" : "e.g. (555) 123-4567"}
                 keyboardType="phone-pad"
                 autoComplete="tel"
                 maxLength={20}
@@ -4283,7 +4337,7 @@ function AddMedicationModal(props: ModalProps) {
                 accessibilityLabel={spanish ? "Tamaño del frasco en mililitros" : "Bottle size in milliliters"}
                 value={props.bottleMl}
                 onChangeText={props.onBottleMl}
-                placeholder="e.g. 5"
+                placeholder={spanish ? "p. ej., 5" : "e.g. 5"}
                 keyboardType="decimal-pad"
                 placeholderTextColor="#81969A"
                 style={styles.input}
@@ -4543,7 +4597,7 @@ function TimePicker({
           </Text>
           <ClockDial value={value} onChange={onChange} language={language} largeText={largeText} />
           <TextInput
-            accessibilityLabel={`Custom ${label.toLowerCase()}`}
+            accessibilityLabel={spanish ? `${label.toLowerCase()} personalizada` : `Custom ${label.toLowerCase()}`}
             value={value}
             onChangeText={onChange}
             placeholder={spanish ? "O escribe, por ejemplo, 8:30 AM" : "Or type e.g. 8:30 AM"}
@@ -4626,7 +4680,7 @@ function ClockDial({
           <Pressable
             accessibilityRole="radio"
             accessibilityState={{ selected: clock.minute === minute }}
-            accessibilityLabel={`${String(minute).padStart(2, "0")} minutes`}
+              accessibilityLabel={language === "es" ? `${String(minute).padStart(2, "0")} minutos` : `${String(minute).padStart(2, "0")} minutes`}
             key={minute}
             onPress={() => setTime(clock.hour, minute)}
             style={[

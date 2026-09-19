@@ -24,7 +24,7 @@ The current ClearCue app is the Expo project in [`mobile/`](mobile). It is the o
 - Time picker, medication search, brand/alias support, category filters, and a reviewed offline catalog of common glaucoma, dry-eye, allergy, and clinician-directed post-operative drops
 - Self-reported dose history, weekly routine insights, refill estimates, and shareable summaries
 - Clinician-safe “How to use drops” guide, including urgent-symptoms guidance
-- Accessibility defaults: large text, high contrast, VoiceOver labels, reduced motion, color-safe labels, and Spanish across the core routine, Settings, and Insights
+- Accessibility defaults: large text, high contrast, VoiceOver labels, reduced motion, color-safe labels, and Spanish across the core routine, Settings, and Insights. An optional black-and-white mode removes color from key surfaces while retaining written medication and dose-status labels.
 - Demo Mode, onboarding, app icon/splash screen, and device-only privacy controls
 - Optional device lock for the medication plan using Face ID, Touch ID, or device passcode in a standalone iPhone build
 - A focused home screen that prioritizes today’s eye-drop routine; reports, privacy, and accessibility are grouped under More care tools

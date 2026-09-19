@@ -74,6 +74,7 @@ type ReminderCheckup = {
 type AppSettings = {
   largeText: boolean;
   highContrast: boolean;
+  colorBlindMode: boolean;
   reduceMotion: boolean;
   hideNotificationDetails: boolean;
   appLockEnabled: boolean;
@@ -135,6 +136,7 @@ const DEMO_MODE_KEY = "clearcue-demo-mode-v1";
 const DEFAULT_SETTINGS: AppSettings = {
   largeText: true,
   highContrast: true,
+  colorBlindMode: false,
   reduceMotion: false,
   hideNotificationDetails: true,
   appLockEnabled: false,
@@ -643,6 +645,7 @@ const extraStyles = StyleSheet.create({
   reminderCheckupAttention: { backgroundColor: "#FFF7E9" },
   reminderCheckupText: { color: "#3A302B", fontSize: 13, lineHeight: 18 },
   reminderCheckupNext: { color: "#557A66", fontSize: 13, fontWeight: "800" },
+  monochromeCheckup: { backgroundColor: "#FFFFFF", borderWidth: 2, borderColor: "#000000" },
   medicationFooter: {
     marginTop: 13,
     paddingTop: 11,
@@ -720,6 +723,11 @@ const extraStyles = StyleSheet.create({
     fontWeight: "800",
     letterSpacing: 0.7,
   },
+  monochromeSurface: { backgroundColor: "#FFFFFF", borderWidth: 2, borderColor: "#000000" },
+  monochromeIcon: { backgroundColor: "#FFFFFF", borderWidth: 2, borderColor: "#000000" },
+  monochromeText: { color: "#000000" },
+  monochromeMutedText: { color: "#303030" },
+  monochromeStatusBadge: { color: "#FFFFFF", backgroundColor: "#000000" },
 });
 
 function parseReminderTime(value: string) {
@@ -1335,10 +1343,10 @@ export default function App() {
   const copy = COPY[settings.language];
   const scaleText = settings.largeText ? styles.largeText : undefined;
   const scaleHeading = settings.largeText
-    ? { fontSize: 40, lineHeight: 46 }
+    ? { fontSize: 46, lineHeight: 54 }
     : undefined;
   const scaleSectionTitle = settings.largeText
-    ? { fontSize: 26, lineHeight: 32 }
+    ? { fontSize: 30, lineHeight: 37 }
     : undefined;
   function recordDose(id: string, requestedStatus: AdherenceStatus) {
     const dose = doses.find((item) => item.id === id);
@@ -1907,9 +1915,10 @@ export default function App() {
         style={[
           styles.safeArea,
           settings.highContrast && styles.highContrastRoot,
+          settings.colorBlindMode && styles.monochromeRoot,
         ]}
       >
-        <StatusBar style={settings.highContrast ? "light" : "dark"} />
+        <StatusBar style={settings.highContrast && !settings.colorBlindMode ? "light" : "dark"} />
         <ScrollView
           ref={homeScrollRef}
           contentContainerStyle={[
@@ -1953,14 +1962,15 @@ export default function App() {
             style={[
               styles.progressCard,
               settings.highContrast && styles.highContrastCard,
+              settings.colorBlindMode && styles.monochromePrimaryCard,
             ]}
           >
             <View>
-              <Text style={styles.cardLabel}>{copy.routine}</Text>
+              <Text style={[styles.cardLabel, settings.colorBlindMode && styles.monochromeLightText]}>{copy.routine}</Text>
               <Text style={[styles.progressText, scaleText]}>{progress}</Text>
             </View>
-            <View style={styles.progressCircle}>
-              <View style={styles.progressInner}>
+              <View style={[styles.progressCircle, settings.colorBlindMode && styles.monochromeProgressCircle]}>
+              <View style={[styles.progressInner, settings.colorBlindMode && styles.monochromeProgressInner]}>
                 <Text style={styles.progressNumber}>{percentage}%</Text>
               </View>
             </View>
@@ -1981,11 +1991,12 @@ export default function App() {
                 style={[
                   extraStyles.reminderCheckupResult,
                   reminderCheckup.tone === "attention" && extraStyles.reminderCheckupAttention,
+                  settings.colorBlindMode && extraStyles.monochromeCheckup,
                 ]}
               >
-                <Text style={extraStyles.reminderCheckupText}>{reminderCheckup.message}</Text>
+                <Text style={[extraStyles.reminderCheckupText, settings.colorBlindMode && extraStyles.monochromeText]}>{reminderCheckup.message}</Text>
                 {reminderCheckup.next && (
-                  <Text style={extraStyles.reminderCheckupNext}>
+                  <Text style={[extraStyles.reminderCheckupNext, settings.colorBlindMode && extraStyles.monochromeText]}>
                     {settings.language === "es" ? "Próximo: " : "Next: "}
                     {reminderCheckup.next}
                   </Text>
@@ -2006,6 +2017,7 @@ export default function App() {
                   : "Reports, privacy, and accessibility."
               }
               onPress={() => setCareToolsOpen(true)}
+              monochrome={settings.colorBlindMode}
             />
           </View>
           <View style={styles.sectionHeader}>
@@ -2024,6 +2036,7 @@ export default function App() {
                   doses={group.doses}
                   language={settings.language}
                   largeText={settings.largeText}
+                  monochrome={settings.colorBlindMode}
                   history={history}
                   onToggle={toggleDose}
                   onSkip={(id) => recordDose(id, "skipped")}
@@ -2037,6 +2050,7 @@ export default function App() {
                 onGuide={() => setGuideOpen(true)}
                 language={settings.language}
                 largeText={settings.largeText}
+                monochrome={settings.colorBlindMode}
               />
             )}
           </View>
@@ -2061,13 +2075,14 @@ export default function App() {
             style={[
               styles.reminderCard,
               settings.highContrast && styles.highContrastSoftCard,
+              settings.colorBlindMode && styles.monochromeSoftCard,
             ]}
           >
             <View style={styles.reminderCopy}>
-              <Text style={[styles.reminderTitle, scaleText]}>
+              <Text style={[styles.reminderTitle, scaleText, settings.colorBlindMode && styles.monochromeText]}>
                 {copy.reminders}
               </Text>
-              <Text style={[styles.reminderText, scaleText]}>
+              <Text style={[styles.reminderText, scaleText, settings.colorBlindMode && styles.monochromeText]}>
                 {remindersEnabled && remindersNeedRefresh
                   ? "Routine changes are saved. Refresh reminders when you are ready."
                   : remindersEnabled
@@ -2088,6 +2103,7 @@ export default function App() {
               style={[
                 styles.reminderButton,
                 remindersEnabled && styles.reminderButtonOn,
+                settings.colorBlindMode && styles.monochromeButton,
               ]}
             >
               <Text style={styles.reminderButtonText}>
@@ -2103,12 +2119,13 @@ export default function App() {
             style={[
               styles.tip,
               settings.highContrast && styles.highContrastSoftCard,
+              settings.colorBlindMode && styles.monochromeSoftCard,
             ]}
           >
-            <Text style={styles.tipIcon}>i</Text>
+            <Text style={[styles.tipIcon, settings.colorBlindMode && styles.monochromeText]}>i</Text>
             <View style={styles.tipContent}>
-              <Text style={[styles.tipTitle, scaleText]}>{copy.spacing}</Text>
-              <Text style={[styles.tipText, scaleText]}>
+              <Text style={[styles.tipTitle, scaleText, settings.colorBlindMode && styles.monochromeText]}>{copy.spacing}</Text>
+              <Text style={[styles.tipText, scaleText, settings.colorBlindMode && styles.monochromeText]}>
                 {copy.spacingDetail}
               </Text>
             </View>
@@ -2116,7 +2133,7 @@ export default function App() {
         </ScrollView>
         <Pressable
           accessibilityRole="button"
-          style={styles.addButton}
+          style={[styles.addButton, settings.colorBlindMode && styles.monochromeButton]}
           onPress={startAddingDose}
           accessibilityLabel={copy.add}
           accessibilityHint={settings.language === "es" ? "Abre un formulario para añadir un recordatorio de gotas" : "Opens a form to add an eye-drop reminder"}
@@ -2237,6 +2254,7 @@ export default function App() {
         visible={careToolsOpen}
         animation={settings.reduceMotion ? "none" : "slide"}
         language={settings.language}
+        monochrome={settings.colorBlindMode}
         onInsights={() => {
           setCareToolsOpen(false);
           openInsights();
@@ -2373,31 +2391,33 @@ function EmptyRoutine({
   onAdd,
   onGuide,
   language,
+  monochrome,
 }: {
   onAdd: () => void;
   onGuide: () => void;
   language: "en" | "es";
   largeText: boolean;
+  monochrome: boolean;
 }) {
   const spanish = language === "es";
   return (
     <View
       accessible
       accessibilityLabel={spanish ? "Tu rutina está vacía. Añade tus primeras gotas para comenzar." : "Your routine is empty. Add your first eye drop to begin."}
-      style={extraStyles.emptyRoutine}
+      style={[extraStyles.emptyRoutine, monochrome && extraStyles.monochromeSurface]}
     >
-      <View style={extraStyles.emptyIcon}>
-        <Text style={extraStyles.emptyIconText}>◒</Text>
+      <View style={[extraStyles.emptyIcon, monochrome && extraStyles.monochromeIcon]}>
+        <Text style={[extraStyles.emptyIconText, monochrome && extraStyles.monochromeText]}>◒</Text>
       </View>
-      <Text style={extraStyles.emptyTitle}>{spanish ? "Comienza tu rutina" : "Start your routine"}</Text>
-      <Text style={extraStyles.emptyText}>
+      <Text style={[extraStyles.emptyTitle, monochrome && extraStyles.monochromeText]}>{spanish ? "Comienza tu rutina" : "Start your routine"}</Text>
+      <Text style={[extraStyles.emptyText, monochrome && extraStyles.monochromeMutedText]}>
         {spanish ? "Añade gotas para crear recordatorios, registrar el progreso y crear un informe que puedes compartir." : "Add an eye drop to create reminders, track progress, and build a shareable report."}
       </Text>
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={spanish ? "Añadir tus primeras gotas" : "Add your first eye drop"}
         onPress={onAdd}
-        style={styles.saveButton}
+        style={[styles.saveButton, monochrome && styles.monochromeButton]}
       >
         <Text style={styles.saveText}>{spanish ? "Añadir primeras gotas" : "Add first eye drop"}</Text>
       </Pressable>
@@ -2416,6 +2436,7 @@ function CareToolsModal({
   visible,
   animation,
   language,
+  monochrome,
   onInsights,
   onPrivacy,
   onSettings,
@@ -2425,6 +2446,7 @@ function CareToolsModal({
   visible: boolean;
   animation: "none" | "slide";
   language: "en" | "es";
+  monochrome: boolean;
   onInsights: () => void;
   onPrivacy: () => void;
   onSettings: () => void;
@@ -2440,7 +2462,7 @@ function CareToolsModal({
       onRequestClose={onClose}
       onDismiss={onDismiss}
     >
-      <SafeAreaView style={styles.modalScreen}>
+      <SafeAreaView style={[styles.modalScreen, monochrome && styles.monochromeRoot]}>
         <View style={styles.modalHeader}>
           <View>
             <Text style={styles.sectionLabel}>
@@ -2462,11 +2484,11 @@ function CareToolsModal({
           </Pressable>
         </View>
         <ScrollView contentContainerStyle={styles.form}>
-          <View style={styles.note}>
-            <Text style={styles.noteTitle}>
+          <View style={[styles.note, monochrome && styles.monochromeSoftCard]}>
+            <Text style={[styles.noteTitle, monochrome && styles.monochromeText]}>
               {spanish ? "Tu rutina es lo primero" : "Your routine comes first"}
             </Text>
-            <Text style={styles.noteText}>
+            <Text style={[styles.noteText, monochrome && styles.monochromeText]}>
               {spanish
                 ? "Estas herramientas te ayudan a revisar tu progreso y ajustar ClearCue sin distraerte de las gotas de hoy."
                 : "These supporting tools help you review progress and adjust ClearCue without taking focus from today’s eye drops."}
@@ -2481,6 +2503,7 @@ function CareToolsModal({
                   : "Review adherence and share a read-only report."
               }
               onPress={onInsights}
+              monochrome={monochrome}
             />
             <HomeAction
               label={spanish ? "Privacidad y datos" : "Privacy & data"}
@@ -2490,6 +2513,7 @@ function CareToolsModal({
                   : "Control local data and notifications."
               }
               onPress={onPrivacy}
+              monochrome={monochrome}
             />
             <HomeAction
               label={spanish ? "Accesibilidad" : "Accessibility"}
@@ -2499,6 +2523,7 @@ function CareToolsModal({
                   : "Adjust text, contrast, language, and demo mode."
               }
               onPress={onSettings}
+              monochrome={monochrome}
             />
           </View>
         </ScrollView>
@@ -2510,10 +2535,12 @@ function HomeAction({
   label,
   detail,
   onPress,
+  monochrome = false,
 }: {
   label: string;
   detail: string;
   onPress: () => void;
+  monochrome?: boolean;
 }) {
   return (
     <Pressable
@@ -2521,13 +2548,13 @@ function HomeAction({
       accessibilityLabel={label}
       accessibilityHint={detail}
       onPress={onPress}
-      style={extraStyles.homeAction}
+      style={[extraStyles.homeAction, monochrome && extraStyles.monochromeSurface]}
     >
       <View style={{ flex: 1 }}>
-        <Text style={extraStyles.homeActionLabel}>{label}</Text>
-        <Text style={extraStyles.homeActionDetail}>{detail}</Text>
+        <Text style={[extraStyles.homeActionLabel, monochrome && extraStyles.monochromeText]}>{label}</Text>
+        <Text style={[extraStyles.homeActionDetail, monochrome && extraStyles.monochromeMutedText]}>{detail}</Text>
       </View>
-      <Text style={extraStyles.homeActionArrow}>›</Text>
+      <Text style={[extraStyles.homeActionArrow, monochrome && extraStyles.monochromeText]}>›</Text>
     </Pressable>
   );
 }
@@ -2535,6 +2562,7 @@ function DoseCard({
   doses,
   language,
   largeText,
+  monochrome,
   history,
   onToggle,
   onSkip,
@@ -2544,6 +2572,7 @@ function DoseCard({
   doses: Dose[];
   language: "en" | "es";
   largeText: boolean;
+  monochrome: boolean;
   history: DoseLog[];
   onToggle: (id: string) => void;
   onSkip: (id: string) => void;
@@ -2575,18 +2604,19 @@ function DoseCard({
       style={[
         extraStyles.medicationCard,
         doses.every((item) => item.completed) && extraStyles.completedMedicationCard,
+        monochrome && extraStyles.monochromeSurface,
       ]}
     >
       <View
-        style={[extraStyles.medicationStripe, { backgroundColor: dose.color === NO_COLOR ? "#D6C4B8" : dose.color }]}
+        style={[extraStyles.medicationStripe, { backgroundColor: monochrome ? "#000000" : dose.color === NO_COLOR ? "#D6C4B8" : dose.color }]}
       />
       <View style={extraStyles.medicationBody}>
         <View style={extraStyles.medicationTop}>
           <View style={{ flex: 1 }}>
-            <Text style={[styles.doseName, largeText && styles.largeText]}>
+            <Text style={[styles.doseName, largeText && styles.largeText, monochrome && styles.monochromeText]}>
               {dose.name}
             </Text>
-            <Text style={[styles.doseDetails, largeText && styles.largeText]}>
+            <Text style={[styles.doseDetails, largeText && styles.largeText, monochrome && styles.monochromeText]}>
               {localizedEye(dose.eye, language)} · {language === "es" ? "etiqueta" : "label"} {colorName}
             </Text>
           </View>
@@ -2627,7 +2657,7 @@ function DoseCard({
             return (
               <View key={scheduledDose.id} style={extraStyles.groupedTimeRow}>
                 <View style={extraStyles.timeBlock}>
-                  <Text style={[styles.time, largeText && styles.largeText]}>
+                  <Text style={[styles.time, largeText && styles.largeText, monochrome && styles.monochromeText]}>
                     {scheduledDose.time}
                   </Text>
                   <Text
@@ -2638,6 +2668,7 @@ function DoseCard({
                         : state === "late" || state === "skipped"
                           ? extraStyles.statusLate
                           : extraStyles.statusDue,
+                      monochrome && extraStyles.monochromeStatusBadge,
                     ]}
                   >
                     {status}
@@ -2649,7 +2680,7 @@ function DoseCard({
                     accessibilityLabel={language === "es" ? `Ver historial de ${dose.name} para las ${scheduledDose.time}` : `View ${dose.name} history for ${scheduledDose.time}`}
                     onPress={() => onHistory(scheduledDose.id)}
                   >
-                    <Text style={extraStyles.cardLink}>
+                    <Text style={[extraStyles.cardLink, monochrome && extraStyles.monochromeText]}>
                       {language === "es" ? "Historial" : "History"}
                     </Text>
                   </Pressable>
@@ -2658,7 +2689,7 @@ function DoseCard({
                     accessibilityLabel={language === "es" ? `${state === "completed" ? "Marcar como no tomada" : "Marcar como tomada"}: ${dose.name} a las ${scheduledDose.time}` : `${state === "completed" ? "Mark incomplete" : "Mark as taken"}: ${dose.name} at ${scheduledDose.time}`}
                     accessibilityHint={language === "es" ? "Registra esta dosis en el historial de seguimiento" : "Records this dose in adherence history"}
                     onPress={() => onToggle(scheduledDose.id)}
-                    style={[styles.doneButton, state === "completed" && styles.checkedButton]}
+                    style={[styles.doneButton, state === "completed" && styles.checkedButton, monochrome && styles.monochromeButton]}
                   >
                     <Text style={styles.doneText}>
                       {state === "completed"
@@ -2691,7 +2722,7 @@ function DoseCard({
                         accessibilityRole="button"
                         accessibilityLabel={language === "es" ? "Registrar como tomada más tarde" : "Record as taken later"}
                         onPress={() => onToggle(scheduledDose.id)}
-                        style={styles.doneButton}
+                        style={[styles.doneButton, monochrome && styles.monochromeButton]}
                       >
                         <Text style={styles.doneText}>{language === "es" ? "Tomada más tarde" : "Taken later"}</Text>
                       </Pressable>
@@ -2709,10 +2740,10 @@ function DoseCard({
               accessibilityLabel={language === "es" ? `Editar ${dose.name}` : `Edit ${dose.name}`}
               onPress={onEdit}
             >
-              <Text style={extraStyles.cardLink}>{language === "es" ? "Editar" : "Edit"}</Text>
+              <Text style={[extraStyles.cardLink, monochrome && extraStyles.monochromeText]}>{language === "es" ? "Editar" : "Edit"}</Text>
             </Pressable>
           </View>
-          <Text style={extraStyles.supplyHelp}>
+          <Text style={[extraStyles.supplyHelp, monochrome && extraStyles.monochromeMutedText]}>
             {language === "es" ? "Cada hora se registra por separado." : "Each time is tracked separately."}
           </Text>
         </View>
@@ -3480,7 +3511,7 @@ function SettingsModal({
       onRequestClose={onClose}
       onDismiss={onDismiss}
     >
-      <SafeAreaView style={styles.modalScreen}>
+      <SafeAreaView style={[styles.modalScreen, settings.colorBlindMode && styles.monochromeRoot]}>
         <View style={styles.modalHeader}>
           <View>
             <Text style={styles.sectionLabel}>CLEARCUE</Text>
@@ -3496,7 +3527,7 @@ function SettingsModal({
           </Pressable>
         </View>
         <ScrollView contentContainerStyle={styles.form}>
-          <Text style={styles.settingsIntro}>
+          <Text style={[styles.settingsIntro, settings.colorBlindMode && styles.monochromeText]}>
             {spanish ? "Haz que ClearCue sea más fácil de ver, leer y usar. Estos ajustes se guardan solo en este dispositivo." : "Make ClearCue easier to see, read, and use. These settings are stored only on this device."}
           </Text>
           <SettingRow
@@ -3510,6 +3541,12 @@ function SettingsModal({
             detail={spanish ? "Usa un contraste más fuerte entre texto, botones y fondos." : "Use stronger contrast between text, buttons, and backgrounds."}
             value={settings.highContrast}
             onChange={(value) => update("highContrast", value)}
+          />
+          <SettingRow
+            title={spanish ? "Modo blanco y negro" : "Black-and-white mode"}
+            detail={spanish ? "Elimina el color de las superficies principales y usa negro, blanco y gris. Las etiquetas de medicamentos permanecen en palabras." : "Remove color from key surfaces and use black, white, and gray. Medication labels remain in words."}
+            value={settings.colorBlindMode}
+            onChange={(value) => update("colorBlindMode", value)}
           />
           <SettingRow
             title={spanish ? "Reducir movimiento" : "Reduce motion"}
@@ -3598,7 +3635,7 @@ function SettingsModal({
             accessibilityRole="button"
             accessibilityLabel={spanish ? "Terminar de ajustar accesibilidad" : "Done adjusting accessibility settings"}
             onPress={onClose}
-            style={styles.saveButton}
+            style={[styles.saveButton, settings.colorBlindMode && styles.monochromeButton]}
           >
             <Text style={styles.saveText}>{spanish ? "Listo" : "Done"}</Text>
           </Pressable>
@@ -4941,7 +4978,7 @@ const styles = StyleSheet.create({
     color: "#3A302B",
     marginTop: 5,
   },
-  subheading: { fontSize: 16, color: "#6F625B", marginTop: 5 },
+  subheading: { fontSize: 18, lineHeight: 25, color: "#6F625B", marginTop: 5 },
   progressCard: {
     marginTop: 25,
     borderRadius: 21,
@@ -4960,7 +4997,8 @@ const styles = StyleSheet.create({
   progressText: {
     color: "#fff",
     fontWeight: "800",
-    fontSize: 18,
+    fontSize: 20,
+    lineHeight: 26,
     marginTop: 8,
   },
   progressCircle: {
@@ -4991,7 +5029,8 @@ const styles = StyleSheet.create({
     color: "#B85C4A",
   },
   sectionTitle: {
-    fontSize: 22,
+    fontSize: 24,
+    lineHeight: 30,
     fontWeight: "800",
     letterSpacing: -0.6,
     color: "#3A302B",
@@ -5018,10 +5057,10 @@ const styles = StyleSheet.create({
     borderColor: "#ffffff80",
   },
   doseInfo: { flex: 1 },
-  doseName: { fontSize: 15, fontWeight: "800", color: "#3A302B" },
-  doseDetails: { fontSize: 12, color: "#6F625B", marginTop: 4 },
+  doseName: { fontSize: 17, lineHeight: 23, fontWeight: "800", color: "#3A302B" },
+  doseDetails: { fontSize: 14, lineHeight: 20, color: "#6F625B", marginTop: 4 },
   doseAction: { alignItems: "flex-end", gap: 6 },
-  time: { fontSize: 12, fontWeight: "800", color: "#B85C4A" },
+  time: { fontSize: 14, lineHeight: 20, fontWeight: "800", color: "#B85C4A" },
   doneButton: {
     backgroundColor: "#B85C4A",
     borderRadius: 10,
@@ -5031,7 +5070,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   checkedButton: { backgroundColor: "#D8B8AD" },
-  doneText: { color: "#fff", fontSize: 12, fontWeight: "800" },
+  doneText: { color: "#fff", fontSize: 14, lineHeight: 19, fontWeight: "800" },
   insightsPanel: {
     marginTop: 20,
     backgroundColor: "#fff",
@@ -5177,11 +5216,11 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   reminderCopy: { flex: 1 },
-  reminderTitle: { color: "#3A302B", fontSize: 14, fontWeight: "800" },
+  reminderTitle: { color: "#3A302B", fontSize: 16, lineHeight: 22, fontWeight: "800" },
   reminderText: {
     color: "#6F625B",
-    fontSize: 12,
-    lineHeight: 17,
+    fontSize: 14,
+    lineHeight: 20,
     marginTop: 4,
   },
   reminderButton: {
@@ -5191,7 +5230,7 @@ const styles = StyleSheet.create({
     borderRadius: 11,
   },
   reminderButtonOn: { backgroundColor: "#8C6755" },
-  reminderButtonText: { color: "#fff", fontSize: 12, fontWeight: "800" },
+  reminderButtonText: { color: "#fff", fontSize: 14, lineHeight: 19, fontWeight: "800" },
   tip: {
     marginTop: 25,
     backgroundColor: "#F5E5D8",
@@ -5202,8 +5241,8 @@ const styles = StyleSheet.create({
   },
   tipIcon: { fontSize: 20, color: "#9B6B3D" },
   tipContent: { flex: 1 },
-  tipTitle: { fontSize: 14, fontWeight: "800", color: "#704D30" },
-  tipText: { fontSize: 12, color: "#704D30", lineHeight: 18, marginTop: 4 },
+  tipTitle: { fontSize: 16, lineHeight: 22, fontWeight: "800", color: "#704D30" },
+  tipText: { fontSize: 14, color: "#704D30", lineHeight: 20, marginTop: 4 },
   addButton: {
     position: "absolute",
     bottom: 23,
@@ -5221,7 +5260,7 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   addPlus: { color: "#fff", fontSize: 21, fontWeight: "700", lineHeight: 22 },
-  addText: { color: "#fff", fontSize: 15, fontWeight: "800" },
+  addText: { color: "#fff", fontSize: 17, lineHeight: 22, fontWeight: "800" },
   modalScreen: { flex: 1, backgroundColor: "#FAF7F2" },
   modalHeader: {
     flexDirection: "row",
@@ -5380,7 +5419,7 @@ const styles = StyleSheet.create({
     lineHeight: 15,
     marginTop: 18,
   },
-  largeText: { fontSize: 18, lineHeight: 25 },
+  largeText: { fontSize: 22, lineHeight: 30 },
   largeContent: { paddingHorizontal: 24 },
   highContrastRoot: { backgroundColor: "#FFFFFF" },
   highContrastCard: {
@@ -5393,6 +5432,14 @@ const styles = StyleSheet.create({
     borderColor: "#3A302B",
     backgroundColor: "#FFFFFF",
   },
+  monochromeRoot: { backgroundColor: "#FFFFFF" },
+  monochromePrimaryCard: { backgroundColor: "#000000", borderWidth: 2, borderColor: "#000000" },
+  monochromeSoftCard: { backgroundColor: "#FFFFFF", borderWidth: 2, borderColor: "#000000" },
+  monochromeButton: { backgroundColor: "#000000", borderWidth: 1, borderColor: "#000000", shadowOpacity: 0 },
+  monochromeText: { color: "#000000" },
+  monochromeLightText: { color: "#FFFFFF" },
+  monochromeProgressCircle: { backgroundColor: "#FFFFFF" },
+  monochromeProgressInner: { backgroundColor: "#000000" },
   settingsIntro: { fontSize: 14, color: "#6F625B", lineHeight: 20 },
   settingRow: {
     flexDirection: "row",

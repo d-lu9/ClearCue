@@ -9,7 +9,7 @@ import {
   medicationDailyMedUrl,
   searchMedications,
 } from "./data/medications";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { SafeAreaView as NativeSafeAreaView } from "react-native-safe-area-context";
 import {
   AccessibilityInfo,
@@ -80,6 +80,10 @@ type AppSettings = {
   appLockEnabled: boolean;
   language: "en" | "es";
 };
+const AccessibilityPresentationContext = createContext({
+  largeText: false,
+  monochrome: false,
+});
 const STARTING_DOSES: Dose[] = [
   {
     id: "1",
@@ -325,7 +329,7 @@ const extraStyles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#B85C4A",
   },
-  timeOptionText: { color: "#6F625B", fontSize: 13, fontWeight: "800" },
+  timeOptionText: { color: "#6F625B", fontSize: 15, lineHeight: 21, fontWeight: "800" },
   timeOptionTextSelected: { color: "#B85C4A" },
   clockPicker: {
     alignItems: "center",
@@ -352,7 +356,7 @@ const extraStyles = StyleSheet.create({
     position: "absolute",
   },
   clockHourSelected: { backgroundColor: "#B85C4A" },
-  clockHourText: { color: "#3A302B", fontSize: 13, fontWeight: "800" },
+  clockHourText: { color: "#3A302B", fontSize: 14, lineHeight: 19, fontWeight: "800" },
   clockHourTextSelected: { color: "#FFFFFF" },
   clockCenterText: {
     alignSelf: "center",
@@ -375,7 +379,7 @@ const extraStyles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
   },
   clockMinuteSelected: { backgroundColor: "#F5E5D8", borderWidth: 1, borderColor: "#B85C4A" },
-  clockMinuteText: { color: "#6F625B", fontSize: 13, fontWeight: "800" },
+  clockMinuteText: { color: "#6F625B", fontSize: 14, lineHeight: 19, fontWeight: "800" },
   clockMinuteTextSelected: { color: "#B85C4A" },
   clockPeriodRow: { flexDirection: "row", gap: 8 },
   clockPeriod: {
@@ -386,7 +390,7 @@ const extraStyles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
   },
   clockPeriodSelected: { backgroundColor: "#F5E5D8", borderWidth: 1, borderColor: "#B85C4A" },
-  clockPeriodText: { color: "#6F625B", fontSize: 13, fontWeight: "800" },
+  clockPeriodText: { color: "#6F625B", fontSize: 14, lineHeight: 19, fontWeight: "800" },
   clockPeriodTextSelected: { color: "#B85C4A" },
   dateMenu: {
     backgroundColor: "#FFFFFF",
@@ -417,6 +421,7 @@ const extraStyles = StyleSheet.create({
     textAlign: "center",
     color: "#6F625B",
     fontSize: 12,
+    lineHeight: 18,
     fontWeight: "800",
   },
   dateGrid: { flexDirection: "row", flexWrap: "wrap" },
@@ -428,7 +433,7 @@ const extraStyles = StyleSheet.create({
     borderRadius: 18,
   },
   dateCellSelected: { backgroundColor: "#B85C4A" },
-  dateCellText: { color: "#3A302B", fontSize: 13, fontWeight: "700" },
+  dateCellText: { color: "#3A302B", fontSize: 14, lineHeight: 19, fontWeight: "700" },
   dateCellTextSelected: { color: "#FFFFFF" },
   extraTimes: {
     backgroundColor: "#EFF8F5",
@@ -1910,7 +1915,9 @@ export default function App() {
     setAppLocked(false);
   }
   return (
-    <>
+    <AccessibilityPresentationContext.Provider
+      value={{ largeText: settings.largeText, monochrome: settings.colorBlindMode }}
+    >
       <SafeAreaView
         style={[
           styles.safeArea,
@@ -1946,7 +1953,7 @@ export default function App() {
               </Pressable>
             </View>
           </View>
-          <Text style={[styles.date, scaleText]}>{copy.today}</Text>
+          <Text style={[styles.date, scaleText, settings.largeText && styles.largeAccentLabel, settings.colorBlindMode && styles.monochromeText]}>{copy.today}</Text>
           <Text style={[styles.greeting, scaleHeading]}>{copy.greeting}</Text>
           <Text style={[styles.subheading, scaleText]}>{copy.subheading}</Text>
           {demoMode && (
@@ -1966,7 +1973,7 @@ export default function App() {
             ]}
           >
             <View>
-              <Text style={[styles.cardLabel, settings.colorBlindMode && styles.monochromeLightText]}>{copy.routine}</Text>
+              <Text style={[styles.cardLabel, settings.largeText && styles.largeCardLabel, settings.colorBlindMode && styles.monochromeLightText]}>{copy.routine}</Text>
               <Text style={[styles.progressText, scaleText]}>{progress}</Text>
             </View>
               <View style={[styles.progressCircle, settings.colorBlindMode && styles.monochromeProgressCircle]}>
@@ -2022,7 +2029,7 @@ export default function App() {
           </View>
           <View style={styles.sectionHeader}>
             <View>
-              <Text style={styles.sectionLabel}>{copy.next}</Text>
+              <AccentLabel>{copy.next}</AccentLabel>
               <Text style={[styles.sectionTitle, scaleSectionTitle]}>
                 {copy.schedule}
               </Text>
@@ -2384,7 +2391,21 @@ export default function App() {
           );
         }}
       />
-    </>
+    </AccessibilityPresentationContext.Provider>
+  );
+}
+function AccentLabel({ children }: { children: string }) {
+  const { largeText, monochrome } = useContext(AccessibilityPresentationContext);
+  return (
+    <Text
+      style={[
+        styles.sectionLabel,
+        largeText && styles.largeAccentLabel,
+        monochrome && styles.monochromeText,
+      ]}
+    >
+      {children}
+    </Text>
   );
 }
 function EmptyRoutine({
@@ -2465,9 +2486,9 @@ function CareToolsModal({
       <SafeAreaView style={[styles.modalScreen, monochrome && styles.monochromeRoot]}>
         <View style={styles.modalHeader}>
           <View>
-            <Text style={styles.sectionLabel}>
+            <AccentLabel>
               {spanish ? "HERRAMIENTAS ADICIONALES" : "ADDITIONAL TOOLS"}
-            </Text>
+            </AccentLabel>
             <Text style={styles.modalTitle}>
               {spanish ? "Atención y ajustes" : "Care & settings"}
             </Text>
@@ -2542,6 +2563,7 @@ function HomeAction({
   onPress: () => void;
   monochrome?: boolean;
 }) {
+  const { largeText } = useContext(AccessibilityPresentationContext);
   return (
     <Pressable
       accessibilityRole="button"
@@ -2551,10 +2573,10 @@ function HomeAction({
       style={[extraStyles.homeAction, monochrome && extraStyles.monochromeSurface]}
     >
       <View style={{ flex: 1 }}>
-        <Text style={[extraStyles.homeActionLabel, monochrome && extraStyles.monochromeText]}>{label}</Text>
-        <Text style={[extraStyles.homeActionDetail, monochrome && extraStyles.monochromeMutedText]}>{detail}</Text>
+        <Text style={[extraStyles.homeActionLabel, largeText && styles.largeHomeActionLabel, monochrome && extraStyles.monochromeText]}>{label}</Text>
+        <Text style={[extraStyles.homeActionDetail, largeText && styles.largeHomeActionDetail, monochrome && extraStyles.monochromeMutedText]}>{detail}</Text>
       </View>
-      <Text style={[extraStyles.homeActionArrow, monochrome && extraStyles.monochromeText]}>›</Text>
+      <Text style={[extraStyles.homeActionArrow, largeText && styles.largeHomeActionLabel, monochrome && extraStyles.monochromeText]}>›</Text>
     </Pressable>
   );
 }
@@ -2680,7 +2702,7 @@ function DoseCard({
                     accessibilityLabel={language === "es" ? `Ver historial de ${dose.name} para las ${scheduledDose.time}` : `View ${dose.name} history for ${scheduledDose.time}`}
                     onPress={() => onHistory(scheduledDose.id)}
                   >
-                    <Text style={[extraStyles.cardLink, monochrome && extraStyles.monochromeText]}>
+                    <Text style={[extraStyles.cardLink, largeText && styles.largeCardLink, monochrome && extraStyles.monochromeText]}>
                       {language === "es" ? "Historial" : "History"}
                     </Text>
                   </Pressable>
@@ -2740,7 +2762,7 @@ function DoseCard({
               accessibilityLabel={language === "es" ? `Editar ${dose.name}` : `Edit ${dose.name}`}
               onPress={onEdit}
             >
-              <Text style={[extraStyles.cardLink, monochrome && extraStyles.monochromeText]}>{language === "es" ? "Editar" : "Edit"}</Text>
+              <Text style={[extraStyles.cardLink, largeText && styles.largeCardLink, monochrome && extraStyles.monochromeText]}>{language === "es" ? "Editar" : "Edit"}</Text>
             </Pressable>
           </View>
           <Text style={[extraStyles.supplyHelp, monochrome && extraStyles.monochromeMutedText]}>
@@ -2918,7 +2940,7 @@ function AdherencePanel({
     : 0;
   return (
     <View style={styles.insightsPanel}>
-      <Text style={styles.sectionLabel}>{spanish ? "ÚLTIMOS 7 DÍAS" : "LAST 7 DAYS"}</Text>
+      <AccentLabel>{spanish ? "ÚLTIMOS 7 DÍAS" : "LAST 7 DAYS"}</AccentLabel>
       <Text style={styles.insightsTitle}>{spanish ? "Registro de rutina autoinformado" : "Self-reported routine record"}</Text>
       <Text style={styles.settingsIntro}>{spanish ? "Se basa solo en las dosis que marcas en ClearCue. No verifica la administración ni la efectividad del tratamiento." : "Based only on doses you mark in ClearCue. It does not verify administration or treatment effectiveness."}</Text>
       <View style={styles.metricRow}>
@@ -3035,6 +3057,7 @@ function DoctorReportModal({
   onClose: () => void;
 }) {
   const spanish = language === "es";
+  const { largeText, monochrome } = useContext(AccessibilityPresentationContext);
   const overall = data.expected
     ? Math.round(((data.taken + data.late) / data.expected) * 100)
     : 0;
@@ -3063,7 +3086,7 @@ function DoctorReportModal({
       <SafeAreaView style={styles.modalScreen}>
         <View style={styles.modalHeader}>
           <View>
-            <Text style={styles.sectionLabel}>{spanish ? "RESUMEN DEL PACIENTE" : "PATIENT SUMMARY"}</Text>
+            <AccentLabel>{spanish ? "RESUMEN DEL PACIENTE" : "PATIENT SUMMARY"}</AccentLabel>
             <Text style={styles.modalTitle}>{spanish ? "Informe para compartir" : "Shareable report"}</Text>
           </View>
           <Pressable
@@ -3100,7 +3123,7 @@ function DoctorReportModal({
             ))}
           </View>
           <View style={styles.reportCard}>
-            <Text style={styles.reportBrand}>{spanish ? "RESUMEN AUTOINFORMADO DE CLEARCUE" : "CLEARCUE SELF-REPORTED SUMMARY"}</Text>
+            <Text style={[styles.reportBrand, largeText && styles.largeAccentLabel, monochrome && styles.monochromeText]}>{spanish ? "RESUMEN AUTOINFORMADO DE CLEARCUE" : "CLEARCUE SELF-REPORTED SUMMARY"}</Text>
             <Text style={styles.reportRange}>{range}</Text>
             <View style={styles.reportMetricGrid}>
               <ReportMetric value={`${overall}%`} label={spanish ? "Dosis registradas" : "Recorded doses"} />
@@ -3224,7 +3247,7 @@ function DoseHistoryModal({
       <SafeAreaView style={styles.modalScreen}>
         <View style={styles.modalHeader}>
           <View>
-            <Text style={styles.sectionLabel}>{spanish ? "ÚLTIMOS 14 DÍAS" : "LAST 14 DAYS"}</Text>
+            <AccentLabel>{spanish ? "ÚLTIMOS 14 DÍAS" : "LAST 14 DAYS"}</AccentLabel>
             <Text style={styles.modalTitle}>{dose.name} {spanish ? "historial" : "history"}</Text>
           </View>
           <Pressable
@@ -3309,9 +3332,9 @@ function AppLockModal({
           <View style={styles.logo}>
             <Text style={styles.logoText}>◒</Text>
           </View>
-          <Text style={styles.sectionLabel}>
+          <AccentLabel>
             {spanish ? "PRIVADO POR DEFECTO" : "PRIVATE BY DEFAULT"}
-          </Text>
+          </AccentLabel>
           <Text style={extraStyles.appLockTitle}>
             {spanish ? "Tu plan está protegido" : "Your plan is protected"}
           </Text>
@@ -3375,7 +3398,7 @@ function PrivacyModal({
       <SafeAreaView style={styles.modalScreen}>
         <View style={styles.modalHeader}>
           <View>
-            <Text style={styles.sectionLabel}>{spanish ? "TUS DATOS" : "YOUR DATA"}</Text>
+            <AccentLabel>{spanish ? "TUS DATOS" : "YOUR DATA"}</AccentLabel>
             <Text style={styles.modalTitle}>{spanish ? "Privacidad y datos" : "Privacy & data"}</Text>
           </View>
           <Pressable
@@ -3514,7 +3537,7 @@ function SettingsModal({
       <SafeAreaView style={[styles.modalScreen, settings.colorBlindMode && styles.monochromeRoot]}>
         <View style={styles.modalHeader}>
           <View>
-            <Text style={styles.sectionLabel}>CLEARCUE</Text>
+            <AccentLabel>CLEARCUE</AccentLabel>
             <Text style={styles.modalTitle}>{spanish ? "Accesibilidad" : "Accessibility"}</Text>
           </View>
           <Pressable
@@ -3699,7 +3722,7 @@ function DropGuideModal({
       <SafeAreaView style={styles.modalScreen}>
         <View style={styles.modalHeader}>
           <View>
-            <Text style={styles.sectionLabel}>{spanish ? "GUÍA DE ACCESIBILIDAD" : "ACCESSIBILITY GUIDE"}</Text>
+            <AccentLabel>{spanish ? "GUÍA DE ACCESIBILIDAD" : "ACCESSIBILITY GUIDE"}</AccentLabel>
             <Text style={styles.modalTitle}>{spanish ? "Cómo usar gotas" : "How to use drops"}</Text>
           </View>
           <Pressable
@@ -3768,6 +3791,7 @@ function OnboardingModal({
   onComplete: () => void;
 }) {
   const spanish = language === "es";
+  const { largeText, monochrome } = useContext(AccessibilityPresentationContext);
   const screens = spanish ? [
     { eyebrow: "BIENVENIDO A CLEARCUE", title: "Rutinas más claras, una gota a la vez.", body: "Mantén recordatorios de gotas, progreso diario y un resumen simple del paciente juntos en tu teléfono." },
     { eyebrow: "TU ATENCIÓN ES LO PRIMERO", title: "ClearCue apoya el plan de tu profesional.", body: "No diagnostica, receta, cambia tu dosis ni reemplaza las instrucciones de tu profesional o la etiqueta de la receta." },
@@ -3802,7 +3826,7 @@ function OnboardingModal({
           <View style={styles.logo}>
             <Text style={styles.logoText}>◒</Text>
           </View>
-          <Text style={styles.sectionLabel}>{current.eyebrow}</Text>
+          <AccentLabel>{current.eyebrow}</AccentLabel>
           <Text style={extraStyles.onboardingTitle}>{current.title}</Text>
           <Text style={extraStyles.onboardingBody}>{current.body}</Text>
           <View style={extraStyles.onboardingDots}>
@@ -3839,7 +3863,7 @@ function OnboardingModal({
               onPress={onComplete}
               style={extraStyles.onboardingSkip}
             >
-              <Text style={styles.history}>{spanish ? "Omitir por ahora" : "Skip for now"}</Text>
+              <Text style={[styles.history, largeText && styles.largeAccentLabel, monochrome && styles.monochromeText]}>{spanish ? "Omitir por ahora" : "Skip for now"}</Text>
             </Pressable>
           )}
         </View>
@@ -3858,17 +3882,18 @@ function SettingRow({
   value: boolean;
   onChange: (value: boolean) => void;
 }) {
+  const { largeText, monochrome } = useContext(AccessibilityPresentationContext);
   return (
     <View style={styles.settingRow}>
       <View style={styles.settingCopy}>
-        <Text style={styles.settingTitle}>{title}</Text>
-        <Text style={styles.settingDetail}>{detail}</Text>
+        <Text style={[styles.settingTitle, largeText && styles.largeSettingTitle, monochrome && styles.monochromeText]}>{title}</Text>
+        <Text style={[styles.settingDetail, largeText && styles.largeSettingDetail, monochrome && styles.monochromeText]}>{detail}</Text>
       </View>
       <Switch
         accessibilityLabel={title}
         value={value}
         onValueChange={onChange}
-        trackColor={{ false: "#D6C4B8", true: "#B85C4A" }}
+        trackColor={{ false: monochrome ? "#737373" : "#D6C4B8", true: monochrome ? "#000000" : "#B85C4A" }}
       />
     </View>
   );
@@ -3951,7 +3976,7 @@ function RoutineReviewModal({ visible, animation, name, eye, times, clinicianIns
           : "The bottle-opened date is more than a year ago. Confirm that it is still the correct bottle and date.",
       );
   }
-  return <Modal visible={visible} animationType={animation} presentationStyle="pageSheet" onRequestClose={onBack} onDismiss={onDismiss}><SafeAreaView style={styles.modalScreen}><View style={styles.modalHeader}><View><Text style={styles.sectionLabel}>{spanish ? "REVISAR RUTINA" : "REVIEW ROUTINE"}</Text><Text style={styles.modalTitle}>{spanish ? "Revisa antes de guardar" : "Check before saving"}</Text></View><Pressable accessibilityRole="button" accessibilityLabel={spanish ? "Volver a editar la rutina" : "Return to routine editing"} onPress={onBack} style={styles.close}><Text style={styles.closeText}>×</Text></Pressable></View><ScrollView contentContainerStyle={styles.form}><View style={styles.note}><Text style={styles.noteTitle}>{spanish ? "ClearCue apoya tu plan" : "ClearCue supports your plan"}</Text><Text style={styles.noteText}>{spanish ? "ClearCue no diagnostica, receta, valida un plan de tratamiento clínico ni reemplaza las instrucciones de tu profesional o la etiqueta de la receta." : "ClearCue does not diagnose, prescribe, validate a clinical treatment plan, or replace your clinician’s instructions or prescription label."}</Text></View><View style={extraStyles.detailsSection}><Text style={styles.fieldLabel}>{name}</Text><Text style={extraStyles.supplyHelp}>{localizedEye(eye, language)} · {times.join(" · ")}</Text>{clinicianInstructions ? <Text style={extraStyles.supplyHelp}>{spanish ? "Instrucciones del profesional: " : "Clinician instructions: "}{clinicianInstructions}</Text> : null}{bottleMl ? <Text style={extraStyles.supplyHelp}>{spanish ? "Estimación de suministro: " : "Supply estimate: "}{bottleMl} mL · {dropsPerApplication} {spanish ? `gota${Number(dropsPerApplication) === 1 ? "" : "s"} por uso` : `drop${Number(dropsPerApplication) === 1 ? "" : "s"} each use`} · {applicationsPerDay} {spanish ? `uso${Number(applicationsPerDay) === 1 ? "" : "s"} al día` : `use${Number(applicationsPerDay) === 1 ? "" : "s"} daily`} · {spanish ? "abierto " : "opened "}{openedOn} · {spanish ? `aviso ${warningDays} días antes de la estimación` : `warning ${warningDays} days before estimate`}</Text> : <Text style={extraStyles.supplyHelp}>{spanish ? "No se agregó estimación de suministro." : "No supply estimate added."}</Text>}</View>{warnings.map((warning) => <View key={warning} style={extraStyles.eraseSection}><Text style={extraStyles.eraseTitle}>{spanish ? "Revisa este detalle" : "Review this detail"}</Text><Text style={extraStyles.eraseText}>{warning}</Text></View>)}<Pressable accessibilityRole="checkbox" accessibilityState={{ checked: confirmed }} accessibilityLabel={spanish ? "Confirmo que revisé estos valores con la receta de mi profesional" : "I checked these values against my clinician's prescription"} onPress={() => onConfirmed(!confirmed)} style={[styles.choice, confirmed && styles.choiceSelected]}><Text style={[styles.choiceText, confirmed && styles.choiceTextSelected]}>{confirmed ? "✓ " : ""}{spanish ? "Confirmo que revisé estos valores con la receta de mi profesional." : "I checked these values against my clinician’s prescription."}</Text></Pressable><Pressable accessibilityRole="button" accessibilityState={{ disabled: !confirmed }} accessibilityLabel={spanish ? "Guardar rutina de gotas revisada" : "Save reviewed eye drop routine"} disabled={!confirmed} onPress={onSave} style={[styles.saveButton, !confirmed && { opacity: 0.45 }]}><Text style={styles.saveText}>{spanish ? "Guardar rutina" : "Save routine"}</Text></Pressable><Pressable accessibilityRole="button" accessibilityLabel={spanish ? "Volver a editar la rutina" : "Return to routine editing"} onPress={onBack} style={extraStyles.emptyGuide}><Text style={extraStyles.cardLink}>{spanish ? "Volver y editar" : "Go back and edit"}</Text></Pressable></ScrollView></SafeAreaView></Modal>;
+  return <Modal visible={visible} animationType={animation} presentationStyle="pageSheet" onRequestClose={onBack} onDismiss={onDismiss}><SafeAreaView style={styles.modalScreen}><View style={styles.modalHeader}><View><AccentLabel>{spanish ? "REVISAR RUTINA" : "REVIEW ROUTINE"}</AccentLabel><Text style={styles.modalTitle}>{spanish ? "Revisa antes de guardar" : "Check before saving"}</Text></View><Pressable accessibilityRole="button" accessibilityLabel={spanish ? "Volver a editar la rutina" : "Return to routine editing"} onPress={onBack} style={styles.close}><Text style={styles.closeText}>×</Text></Pressable></View><ScrollView contentContainerStyle={styles.form}><View style={styles.note}><Text style={styles.noteTitle}>{spanish ? "ClearCue apoya tu plan" : "ClearCue supports your plan"}</Text><Text style={styles.noteText}>{spanish ? "ClearCue no diagnostica, receta, valida un plan de tratamiento clínico ni reemplaza las instrucciones de tu profesional o la etiqueta de la receta." : "ClearCue does not diagnose, prescribe, validate a clinical treatment plan, or replace your clinician’s instructions or prescription label."}</Text></View><View style={extraStyles.detailsSection}><Text style={styles.fieldLabel}>{name}</Text><Text style={extraStyles.supplyHelp}>{localizedEye(eye, language)} · {times.join(" · ")}</Text>{clinicianInstructions ? <Text style={extraStyles.supplyHelp}>{spanish ? "Instrucciones del profesional: " : "Clinician instructions: "}{clinicianInstructions}</Text> : null}{bottleMl ? <Text style={extraStyles.supplyHelp}>{spanish ? "Estimación de suministro: " : "Supply estimate: "}{bottleMl} mL · {dropsPerApplication} {spanish ? `gota${Number(dropsPerApplication) === 1 ? "" : "s"} por uso` : `drop${Number(dropsPerApplication) === 1 ? "" : "s"} each use`} · {applicationsPerDay} {spanish ? `uso${Number(applicationsPerDay) === 1 ? "" : "s"} al día` : `use${Number(applicationsPerDay) === 1 ? "" : "s"} daily`} · {spanish ? "abierto " : "opened "}{openedOn} · {spanish ? `aviso ${warningDays} días antes de la estimación` : `warning ${warningDays} days before estimate`}</Text> : <Text style={extraStyles.supplyHelp}>{spanish ? "No se agregó estimación de suministro." : "No supply estimate added."}</Text>}</View>{warnings.map((warning) => <View key={warning} style={extraStyles.eraseSection}><Text style={extraStyles.eraseTitle}>{spanish ? "Revisa este detalle" : "Review this detail"}</Text><Text style={extraStyles.eraseText}>{warning}</Text></View>)}<Pressable accessibilityRole="checkbox" accessibilityState={{ checked: confirmed }} accessibilityLabel={spanish ? "Confirmo que revisé estos valores con la receta de mi profesional" : "I checked these values against my clinician's prescription"} onPress={() => onConfirmed(!confirmed)} style={[styles.choice, confirmed && styles.choiceSelected]}><Text style={[styles.choiceText, confirmed && styles.choiceTextSelected]}>{confirmed ? "✓ " : ""}{spanish ? "Confirmo que revisé estos valores con la receta de mi profesional." : "I checked these values against my clinician’s prescription."}</Text></Pressable><Pressable accessibilityRole="button" accessibilityState={{ disabled: !confirmed }} accessibilityLabel={spanish ? "Guardar rutina de gotas revisada" : "Save reviewed eye drop routine"} disabled={!confirmed} onPress={onSave} style={[styles.saveButton, !confirmed && { opacity: 0.45 }]}><Text style={styles.saveText}>{spanish ? "Guardar rutina" : "Save routine"}</Text></Pressable><Pressable accessibilityRole="button" accessibilityLabel={spanish ? "Volver a editar la rutina" : "Return to routine editing"} onPress={onBack} style={extraStyles.emptyGuide}><Text style={extraStyles.cardLink}>{spanish ? "Volver y editar" : "Go back and edit"}</Text></Pressable></ScrollView></SafeAreaView></Modal>;
 }
 function AddMedicationModal(props: ModalProps) {
   const spanish = props.language === "es";
@@ -3982,7 +4007,7 @@ function AddMedicationModal(props: ModalProps) {
       <SafeAreaView style={styles.modalScreen}>
         <View style={styles.modalHeader}>
           <View>
-            <Text style={styles.sectionLabel}>
+            <AccentLabel>
               {props.isEditing
                 ? props.language === "es"
                   ? "EDITAR RUTINA"
@@ -3990,7 +4015,7 @@ function AddMedicationModal(props: ModalProps) {
                 : props.language === "es"
                   ? "NUEVA RUTINA"
                   : "NEW ROUTINE"}
-            </Text>
+            </AccentLabel>
             <Text style={styles.modalTitle}>
               {props.isEditing
                 ? props.language === "es"
@@ -4583,6 +4608,7 @@ function TimePicker({
   largeText: boolean;
 }) {
   const spanish = language === "es";
+  const { monochrome } = useContext(AccessibilityPresentationContext);
   const [open, setOpen] = useState(false);
   return (
     <Field label={label}>
@@ -4594,14 +4620,14 @@ function TimePicker({
         onPress={() => setOpen((current) => !current)}
         style={extraStyles.timePickerButton}
       >
-        <Text style={[extraStyles.timePickerValue, largeText && { fontSize: 19 }]}>
+        <Text style={[extraStyles.timePickerValue, largeText && styles.largeMenuText, monochrome && styles.monochromeText]}>
           {value || (spanish ? "Selecciona una hora" : "Select a time")}
         </Text>
-        <Text style={extraStyles.timePickerArrow}>{open ? "⌃" : "⌄"}</Text>
+        <Text style={[extraStyles.timePickerArrow, largeText && styles.largeMenuText, monochrome && styles.monochromeText]}>{open ? "⌃" : "⌄"}</Text>
       </Pressable>
       {open && (
         <View style={extraStyles.timeMenu}>
-          <Text style={extraStyles.supplyHelp}>{spanish ? "Elige una hora común" : "Choose a common time"}</Text>
+          <Text style={[extraStyles.supplyHelp, largeText && styles.largeMenuText, monochrome && styles.monochromeText]}>{spanish ? "Elige una hora común" : "Choose a common time"}</Text>
           <View style={extraStyles.timeMenuGrid}>
             {TIME_OPTIONS.map((option) => (
               <Pressable
@@ -4621,7 +4647,9 @@ function TimePicker({
                 <Text
                   style={[
                     extraStyles.timeOptionText,
+                    largeText && styles.largeMenuText,
                     value === option && extraStyles.timeOptionTextSelected,
+                    monochrome && styles.monochromeText,
                   ]}
                 >
                   {option}
@@ -4629,7 +4657,7 @@ function TimePicker({
               </Pressable>
             ))}
           </View>
-          <Text style={[styles.fieldLabel, { marginTop: 5 }]}>
+          <Text style={[styles.fieldLabel, largeText && styles.largeFieldLabel, monochrome && styles.monochromeText, { marginTop: 5 }]}>
             {spanish ? "O establece una hora personalizada" : "Or set a custom time"}
           </Text>
           <ClockDial value={value} onChange={onChange} language={language} largeText={largeText} />
@@ -4641,7 +4669,7 @@ function TimePicker({
             placeholderTextColor="#81969A"
             style={styles.input}
           />
-          <Text style={extraStyles.supplyHelp}>
+          <Text style={[extraStyles.supplyHelp, largeText && styles.largeMenuText, monochrome && styles.monochromeText]}>
             {spanish ? "Elige una hora, minutos y AM/PM, o escribe una hora precisa. El recordatorio de tu iPhone usará esta hora exacta." : "Choose an hour, minutes, and AM/PM—or type a precise time. Your iPhone reminder will use this exact time."}
           </Text>
         </View>
@@ -4660,6 +4688,7 @@ function ClockDial({
   language: "en" | "es";
   largeText: boolean;
 }) {
+  const { monochrome } = useContext(AccessibilityPresentationContext);
   const clock = parseReminderTime(value) ?? { hour: 9, minute: 0 };
   const displayHour = clock.hour % 12 || 12;
   const period = clock.hour >= 12 ? "PM" : "AM";
@@ -4667,7 +4696,7 @@ function ClockDial({
     onChange(formatReminderTime(hour, minute));
   return (
     <View style={extraStyles.clockPicker}>
-      <Text style={extraStyles.supplyHelp}>{language === "es" ? "Toca el reloj para elegir una hora" : "Tap the clock to choose an hour"}</Text>
+      <Text style={[extraStyles.supplyHelp, largeText && styles.largeMenuText, monochrome && styles.monochromeText]}>{language === "es" ? "Toca el reloj para elegir una hora" : "Tap the clock to choose an hour"}</Text>
       <View style={extraStyles.clockDial}>
         {Array.from({ length: 12 }, (_, index) => index + 1).map((hour) => {
           const angle = ((hour % 12) * Math.PI) / 6 - Math.PI / 2;
@@ -4699,8 +4728,9 @@ function ClockDial({
               <Text
                 style={[
                 extraStyles.clockHourText,
-                largeText && { fontSize: 15 },
-                  displayHour === hour && extraStyles.clockHourTextSelected,
+                largeText && styles.largeClockText,
+                displayHour === hour && extraStyles.clockHourTextSelected,
+                monochrome && ! (displayHour === hour) && styles.monochromeText,
                 ]}
               >
                 {hour}
@@ -4708,7 +4738,7 @@ function ClockDial({
             </Pressable>
           );
         })}
-        <Text style={extraStyles.clockCenterText}>
+        <Text style={[extraStyles.clockCenterText, largeText && styles.largeMenuText, monochrome && styles.monochromeText]}>
           {formatReminderTime(clock.hour, clock.minute)}
         </Text>
       </View>
@@ -4728,8 +4758,9 @@ function ClockDial({
             <Text
               style={[
                 extraStyles.clockMinuteText,
-                largeText && { fontSize: 15 },
+                largeText && styles.largeClockText,
                 clock.minute === minute && extraStyles.clockMinuteTextSelected,
+                monochrome && !(clock.minute === minute) && styles.monochromeText,
               ]}
             >
               {String(minute).padStart(2, "0")}
@@ -4763,7 +4794,9 @@ function ClockDial({
             <Text
               style={[
                 extraStyles.clockPeriodText,
+                largeText && styles.largeClockText,
                 period === nextPeriod && extraStyles.clockPeriodTextSelected,
+                monochrome && !(period === nextPeriod) && styles.monochromeText,
               ]}
             >
               {nextPeriod}
@@ -4788,6 +4821,7 @@ function DatePicker({
   largeText: boolean;
 }) {
   const spanish = language === "es";
+  const { monochrome } = useContext(AccessibilityPresentationContext);
   const [open, setOpen] = useState(false);
   const selectedDate = isValidIsoDate(value)
     ? new Date(`${value}T00:00:00`)
@@ -4826,8 +4860,8 @@ function DatePicker({
         onPress={openCalendar}
         style={extraStyles.timePickerButton}
       >
-        <Text style={[extraStyles.timePickerValue, largeText && { fontSize: 19 }]}>{value}</Text>
-        <Text style={extraStyles.timePickerArrow}>{open ? "⌃" : "⌄"}</Text>
+        <Text style={[extraStyles.timePickerValue, largeText && styles.largeMenuText, monochrome && styles.monochromeText]}>{value}</Text>
+        <Text style={[extraStyles.timePickerArrow, largeText && styles.largeMenuText, monochrome && styles.monochromeText]}>{open ? "⌃" : "⌄"}</Text>
       </Pressable>
       {open && (
         <View style={extraStyles.dateMenu}>
@@ -4843,9 +4877,9 @@ function DatePicker({
               }
               style={extraStyles.dateMonthButton}
             >
-              <Text style={extraStyles.dateMonthButtonText}>‹</Text>
+              <Text style={[extraStyles.dateMonthButtonText, largeText && styles.largeMenuText, monochrome && styles.monochromeText]}>‹</Text>
             </Pressable>
-            <Text style={[extraStyles.dateMonthLabel, largeText && { fontSize: 17 }]}>{monthLabel}</Text>
+            <Text style={[extraStyles.dateMonthLabel, largeText && styles.largeMenuText, monochrome && styles.monochromeText]}>{monthLabel}</Text>
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={spanish ? "Mes siguiente" : "Next month"}
@@ -4857,7 +4891,7 @@ function DatePicker({
               }
               style={extraStyles.dateMonthButton}
             >
-              <Text style={extraStyles.dateMonthButtonText}>›</Text>
+              <Text style={[extraStyles.dateMonthButtonText, largeText && styles.largeMenuText, monochrome && styles.monochromeText]}>›</Text>
             </Pressable>
           </View>
           <View style={extraStyles.dateWeekRow}>
@@ -4865,7 +4899,7 @@ function DatePicker({
               ? ["D", "L", "M", "X", "J", "V", "S"]
               : ["S", "M", "T", "W", "T", "F", "S"]
             ).map((day, index) => (
-              <Text key={`${day}-${index}`} style={extraStyles.dateWeekday}>
+              <Text key={`${day}-${index}`} style={[extraStyles.dateWeekday, largeText && styles.largeClockText, monochrome && styles.monochromeText]}>
                 {day}
               </Text>
             ))}
@@ -4902,11 +4936,12 @@ function DatePicker({
                   <Text
                     style={[
                       extraStyles.dateCellText,
-                      largeText && { fontSize: 15 },
+                      largeText && styles.largeClockText,
                       selectedDate.getFullYear() === visibleMonth.getFullYear() &&
                         selectedDate.getMonth() === visibleMonth.getMonth() &&
                         selectedDate.getDate() === day &&
-                        extraStyles.dateCellTextSelected,
+                      extraStyles.dateCellTextSelected,
+                      monochrome && !(selectedDate.getFullYear() === visibleMonth.getFullYear() && selectedDate.getMonth() === visibleMonth.getMonth() && selectedDate.getDate() === day) && styles.monochromeText,
                     ]}
                   >
                     {day}
@@ -4927,9 +4962,10 @@ function Field({
   label: string;
   children: React.ReactNode;
 }) {
+  const { largeText, monochrome } = useContext(AccessibilityPresentationContext);
   return (
     <View>
-      <Text style={styles.fieldLabel}>{label}</Text>
+      <Text style={[styles.fieldLabel, largeText && styles.largeFieldLabel, monochrome && styles.monochromeText]}>{label}</Text>
       {children}
     </View>
   );
@@ -4967,8 +5003,9 @@ const styles = StyleSheet.create({
   date: {
     marginTop: 42,
     fontWeight: "800",
-    fontSize: 11,
-    letterSpacing: 1.6,
+    fontSize: 13,
+    lineHeight: 19,
+    letterSpacing: 1.15,
     color: "#B85C4A",
   },
   greeting: {
@@ -4989,8 +5026,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   cardLabel: {
-    fontSize: 10,
-    letterSpacing: 1.25,
+    fontSize: 12,
+    lineHeight: 18,
+    letterSpacing: 1,
     fontWeight: "800",
     color: "#FBE3DA",
   },
@@ -5023,10 +5061,12 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   sectionLabel: {
-    fontSize: 10,
+    fontSize: 13,
+    lineHeight: 19,
     fontWeight: "800",
-    letterSpacing: 1.3,
+    letterSpacing: 0.9,
     color: "#B85C4A",
+    marginBottom: 4,
   },
   sectionTitle: {
     fontSize: 24,
@@ -5299,7 +5339,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 12,
     paddingHorizontal: 13,
-    fontSize: 17,
+    fontSize: 19,
+    lineHeight: 25,
     color: "#3A302B",
   },
   choiceRow: { flexDirection: "row", gap: 8 },
@@ -5420,6 +5461,16 @@ const styles = StyleSheet.create({
     marginTop: 18,
   },
   largeText: { fontSize: 22, lineHeight: 30 },
+  largeAccentLabel: { fontSize: 18, lineHeight: 25, letterSpacing: 0.8 },
+  largeCardLabel: { fontSize: 16, lineHeight: 22, letterSpacing: 0.8 },
+  largeFieldLabel: { fontSize: 19, lineHeight: 26 },
+  largeMenuText: { fontSize: 20, lineHeight: 27 },
+  largeClockText: { fontSize: 16, lineHeight: 21 },
+  largeSettingTitle: { fontSize: 20, lineHeight: 27 },
+  largeSettingDetail: { fontSize: 16, lineHeight: 23 },
+  largeHomeActionLabel: { fontSize: 20, lineHeight: 27 },
+  largeHomeActionDetail: { fontSize: 16, lineHeight: 23 },
+  largeCardLink: { fontSize: 16, lineHeight: 22 },
   largeContent: { paddingHorizontal: 24 },
   highContrastRoot: { backgroundColor: "#FFFFFF" },
   highContrastCard: {

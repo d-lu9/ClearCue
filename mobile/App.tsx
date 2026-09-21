@@ -186,17 +186,17 @@ const COPY = {
     greeting: "Buenos días.",
     subheading: "Tu rutina de cuidado ocular, más sencilla.",
     routine: "RUTINA DE HOY",
-    next: "PRÓXIMAMENTE",
+    next: "PRÓXIMA DOSIS",
     schedule: "Horario de hoy",
     insights: "Estadísticas",
     close: "Cerrar",
     done: "Listo",
-    add: "Añadir gotas",
+    add: "Añadir gota",
     settings: "Ajustes de accesibilidad",
     reminders: "Recordatorios diarios",
     enable: "Activar",
     synced: "Recordatorios activos",
-    spacing: "El espacio importa",
+    spacing: "Respeta el intervalo",
     spacingDetail:
       "Deja al menos 5 minutos entre gotas diferentes en el mismo ojo.",
     insightsReport: "Estadísticas e informe",
@@ -736,12 +736,13 @@ const extraStyles = StyleSheet.create({
 });
 
 function parseReminderTime(value: string) {
-  const match = value.trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+  const match = value.trim().match(/^(\d{1,2}):(\d{2})(?:\s*(AM|PM))?$/i);
   if (!match) return null;
   let hour = Number(match[1]);
   const minute = Number(match[2]);
-  const period = match[3].toUpperCase();
-  if (hour < 1 || hour > 12 || minute > 59) return null;
+  const period = match[3]?.toUpperCase();
+  if (minute > 59 || (period ? hour < 1 || hour > 12 : hour > 23)) return null;
+  if (!period && hour < 0) return null;
   if (period === "PM" && hour !== 12) hour += 12;
   if (period === "AM" && hour === 12) hour = 0;
   return { hour, minute };
@@ -750,6 +751,11 @@ function formatReminderTime(hour: number, minute: number) {
   const period = hour >= 12 ? "PM" : "AM";
   const displayHour = hour % 12 || 12;
   return `${displayHour}:${String(minute).padStart(2, "0")} ${period}`;
+}
+function displayReminderTime(value: string, language: "en" | "es") {
+  const clock = parseReminderTime(value);
+  if (!clock || language === "en") return value;
+  return `${String(clock.hour).padStart(2, "0")}:${String(clock.minute).padStart(2, "0")}`;
 }
 
 function dateKey(date: Date) {
@@ -1179,8 +1185,12 @@ export default function App() {
         }
       } catch {
         Alert.alert(
-          "Could not restore saved routine / No se pudo restaurar la rutina guardada",
-          "ClearCue will continue with the current routine. / ClearCue continuará con la rutina actual.",
+          settings.language === "es"
+            ? "No se pudo restaurar la rutina guardada"
+            : "Could not restore saved routine",
+          settings.language === "es"
+            ? "ClearCue continuará con la rutina actual."
+            : "ClearCue will continue with the current routine.",
         );
       } finally {
         setHydrated(true);
@@ -1327,10 +1337,6 @@ export default function App() {
         .catch(() => undefined);
     return () => subscription.remove();
   }, [demoMode, doses, hydrated, settings.hideNotificationDetails, settings.language]);
-  const accessibilityPresentation = useMemo(
-    () => ({ largeText: settings.largeText, monochrome: settings.colorBlindMode }),
-    [settings.largeText, settings.colorBlindMode],
-  );
   const complete = doses.filter((dose) => dose.completed).length;
   const percentage = doses.length
     ? Math.round((complete / doses.length) * 100)
@@ -1465,7 +1471,7 @@ export default function App() {
     if (closeDose) {
       setRoutineFormNotice({
         title: settings.language === "es" ? "Estas gotas están muy juntas" : "These drops are very close together",
-        message: settings.language === "es" ? `${closeDose.name} está programado a las ${closeDose.time}. Confirma el intervalo en las instrucciones del profesional antes de guardar.` : `${closeDose.name} is scheduled at ${closeDose.time}. Confirm the spacing in the clinician’s instructions before saving.`,
+        message: settings.language === "es" ? `${closeDose.name} está programado a las ${displayReminderTime(closeDose.time, "es")}. Confirma el intervalo en las instrucciones del profesional antes de guardar.` : `${closeDose.name} is scheduled at ${closeDose.time}. Confirm the spacing in the clinician’s instructions before saving.`,
         allowReview: true,
       });
       return;
@@ -1681,8 +1687,8 @@ export default function App() {
         Alert.alert(
           settings.language === "es" ? "Las notificaciones están desactivadas" : "Notifications are off",
           settings.language === "es"
-            ? "Para recibir recordatorios, permite las notificaciones de ClearCue en la configuración de tu iPhone."
-            : "To receive reminders, allow notifications for ClearCue in your iPhone Settings.",
+            ? "Para recibir recordatorios, permite las notificaciones de ClearCue en la configuración de tu dispositivo."
+            : "To receive reminders, allow notifications for ClearCue in your device settings.",
         );
         return;
       }
@@ -1738,7 +1744,7 @@ export default function App() {
         })
         .sort((a, b) => a.next.getTime() - b.next.getTime())[0];
       const next = nextDose
-        ? `${nextDose.dose.name} · ${nextDose.dose.time}`
+        ? `${nextDose.dose.name} · ${displayReminderTime(nextDose.dose.time, settings.language)}`
         : null;
       if (!permissions.granted) {
         setReminderCheckup({
@@ -1893,8 +1899,8 @@ export default function App() {
             ? "La protección del dispositivo no está lista"
             : "Device protection is not ready",
           settings.language === "es"
-            ? "Configura Face ID, Touch ID o un código del dispositivo antes de activar el bloqueo de ClearCue."
-            : "Set up Face ID, Touch ID, or a device passcode before turning on ClearCue app lock.",
+            ? "Configura la autenticación biométrica o un código del dispositivo antes de activar el bloqueo de ClearCue."
+            : "Set up biometric authentication or a device passcode before turning on ClearCue app lock.",
         );
         return false;
       }
@@ -1913,8 +1919,8 @@ export default function App() {
           ? "No se pudo verificar la protección del dispositivo"
           : "Could not verify device protection",
         settings.language === "es"
-          ? "Inténtalo de nuevo en una compilación de desarrollo de ClearCue o TestFlight en tu iPhone."
-          : "Try again in a ClearCue development or TestFlight build on your iPhone.",
+          ? "Inténtalo de nuevo en una compilación de desarrollo o distribución de ClearCue en tu dispositivo."
+          : "Try again in a ClearCue development or distribution build on your device.",
       );
       return false;
     }
@@ -2695,7 +2701,7 @@ function DoseCard({
               <View key={scheduledDose.id} style={extraStyles.groupedTimeRow}>
                 <View style={extraStyles.timeBlock}>
                   <Text style={[styles.time, largeText && styles.largeText, monochrome && styles.monochromeText]}>
-                    {scheduledDose.time}
+                    {displayReminderTime(scheduledDose.time, language)}
                   </Text>
                   <Text
                     style={[
@@ -2714,7 +2720,7 @@ function DoseCard({
                 <View style={extraStyles.cardLinks}>
                   <Pressable
                     accessibilityRole="button"
-                    accessibilityLabel={language === "es" ? `Ver historial de ${dose.name} para las ${scheduledDose.time}` : `View ${dose.name} history for ${scheduledDose.time}`}
+                    accessibilityLabel={language === "es" ? `Ver historial de ${dose.name} para las ${displayReminderTime(scheduledDose.time, language)}` : `View ${dose.name} history for ${scheduledDose.time}`}
                     onPress={() => onHistory(scheduledDose.id)}
                   >
                     <Text style={[extraStyles.cardLink, largeText && styles.largeCardLink, monochrome && extraStyles.monochromeText]}>
@@ -2723,7 +2729,7 @@ function DoseCard({
                   </Pressable>
                   <Pressable
                     accessibilityRole="button"
-                    accessibilityLabel={language === "es" ? `${state === "completed" ? "Marcar como no tomada" : "Marcar como tomada"}: ${dose.name} a las ${scheduledDose.time}` : `${state === "completed" ? "Mark incomplete" : "Mark as taken"}: ${dose.name} at ${scheduledDose.time}`}
+                    accessibilityLabel={language === "es" ? `${state === "completed" ? "Marcar como no tomada" : "Marcar como tomada"}: ${dose.name} a las ${displayReminderTime(scheduledDose.time, language)}` : `${state === "completed" ? "Mark incomplete" : "Mark as taken"}: ${dose.name} at ${scheduledDose.time}`}
                     accessibilityHint={language === "es" ? "Registra esta dosis en el historial de seguimiento" : "Records this dose in adherence history"}
                     onPress={() => onToggle(scheduledDose.id)}
                     style={[styles.doneButton, state === "completed" && styles.checkedButton, monochrome && styles.monochromeButton]}
@@ -2831,7 +2837,7 @@ function buildAdherence(
     });
     days.push({
       date: key,
-      label: current.toLocaleDateString(language === "es" ? "es-US" : "en-US", { weekday: "narrow" }),
+      label: current.toLocaleDateString(language === "es" ? "es-419" : "en-US", { weekday: "narrow" }),
       statuses,
     });
   }
@@ -3082,7 +3088,7 @@ function DoctorReportModal({
   const end = new Date();
   const start = new Date(end);
   start.setDate(start.getDate() - (days - 1));
-  const locale = spanish ? "es-US" : "en-US";
+  const locale = spanish ? "es-419" : "en-US";
   const range = `${start.toLocaleDateString(locale, { month: "short", day: "numeric" })} – ${end.toLocaleDateString(locale, { month: "short", day: "numeric", year: "numeric" })}`;
   async function shareReport() {
     await Share.share({
@@ -3198,7 +3204,7 @@ function DoseHistoryModal({
 }) {
   if (!dose) return null;
   const spanish = language === "es";
-  const locale = spanish ? "es-US" : "en-US";
+  const locale = spanish ? "es-419" : "en-US";
   const now = new Date();
   const entries = Array.from({ length: 14 }, (_, index) => {
     const day = new Date(now);
@@ -3294,7 +3300,7 @@ function DoseHistoryModal({
                   {entry.recordedAt
                     ? spanish ? `Registrada ${entry.recordedAt}` : `Recorded ${entry.recordedAt}`
                     : entry.status === "upcoming"
-                      ? spanish ? `Programada ${dose.time}` : `Scheduled ${dose.time}`
+                      ? spanish ? `Programada ${displayReminderTime(dose.time, language)}` : `Scheduled ${dose.time}`
                       : spanish ? "Sin dosis registrada" : "No recorded dose"}
                 </Text>
               </View>
@@ -3355,8 +3361,8 @@ function AppLockModal({
           </Text>
           <Text style={extraStyles.appLockBody}>
             {spanish
-              ? "Usa Face ID, Touch ID o el código de tu dispositivo para abrir ClearCue."
-              : "Use Face ID, Touch ID, or your device passcode to open ClearCue."}
+              ? "Usa la autenticación biométrica o el código de tu dispositivo para abrir ClearCue."
+              : "Use biometric authentication or your device passcode to open ClearCue."}
           </Text>
         </View>
         <Pressable
@@ -3441,21 +3447,21 @@ function PrivacyModal({
           <SettingRow
             title={
               spanish
-                ? "Proteger ClearCue con Face ID"
-                : "Protect ClearCue with Face ID"
+                ? "Proteger ClearCue con autenticación biométrica"
+                : "Protect ClearCue with biometric authentication"
             }
             detail={
               spanish
-                ? "Usa Face ID, Touch ID o el código de tu dispositivo para desbloquear tu plan cuando ClearCue vuelve al frente."
-                : "Use Face ID, Touch ID, or your device passcode to unlock your medication plan after ClearCue leaves the foreground."
+                ? "Usa la autenticación biométrica o el código de tu dispositivo para desbloquear tu plan cuando ClearCue vuelve al frente."
+                : "Use biometric authentication or your device passcode to unlock your medication plan after ClearCue leaves the foreground."
             }
             value={appLockEnabled}
             onChange={onAppLockChange}
           />
           <Text style={styles.settingsIntro}>
             {spanish
-              ? "Face ID requiere una compilación de desarrollo de ClearCue o TestFlight en un iPhone; no se puede probar completamente en Expo Go."
-              : "Face ID requires a ClearCue development or TestFlight build on an iPhone; it cannot be fully tested in Expo Go."}
+              ? "La autenticación biométrica requiere una compilación de desarrollo o distribución de ClearCue; no se puede probar completamente en Expo Go."
+              : "Biometric authentication requires a ClearCue development or distribution build; it cannot be fully tested in Expo Go."}
           </Text>
           <View style={styles.note}>
             <Text style={styles.noteTitle}>{spanish ? "Compartir permanece bajo tu control" : "Sharing stays in your control"}</Text>
@@ -4512,7 +4518,7 @@ function AddMedicationModal(props: ModalProps) {
                 <Pressable
                   accessibilityRole="radio"
                   accessibilityState={{ selected: props.color === item }}
-                  accessibilityLabel={`${COLOR_NAMES[item]?.[props.language] ?? (spanish ? "Personalizado" : "Custom")} ${spanish ? "etiqueta del frasco" : "bottle label"}`}
+                  accessibilityLabel={spanish ? `Etiqueta del frasco ${COLOR_NAMES[item]?.es ?? "personalizada"}` : `${COLOR_NAMES[item]?.en ?? "Custom"} bottle label`}
                   key={item}
                   onPress={() => props.onColor(item)}
                   style={[
@@ -4648,7 +4654,7 @@ function TimePicker({
               <Pressable
                 accessibilityRole="radio"
                 accessibilityState={{ selected: value === option }}
-                accessibilityLabel={option}
+                accessibilityLabel={displayReminderTime(option, language)}
                 key={option}
                 onPress={() => {
                   onChange(option);
@@ -4667,7 +4673,7 @@ function TimePicker({
                     monochrome && styles.monochromeText,
                   ]}
                 >
-                  {option}
+                  {displayReminderTime(option, language)}
                 </Text>
               </Pressable>
             ))}
@@ -4677,15 +4683,15 @@ function TimePicker({
           </Text>
           <ClockDial value={value} onChange={onChange} language={language} largeText={largeText} />
           <TextInput
-            accessibilityLabel={spanish ? `${label.toLowerCase()} personalizada` : `Custom ${label.toLowerCase()}`}
-            value={value}
+            accessibilityLabel={spanish ? `Hora personalizada: ${label.toLowerCase()}` : `Custom ${label.toLowerCase()}`}
+            value={spanish ? displayReminderTime(value, language) : value}
             onChangeText={onChange}
-            placeholder={spanish ? "O escribe, por ejemplo, 8:30 AM" : "Or type e.g. 8:30 AM"}
+            placeholder={spanish ? "O escribe, por ejemplo, 20:30" : "Or type e.g. 8:30 AM"}
             placeholderTextColor="#81969A"
             style={styles.input}
           />
           <Text style={[extraStyles.supplyHelp, largeText && styles.largeMenuText, monochrome && styles.monochromeText]}>
-            {spanish ? "Elige una hora, minutos y AM/PM, o escribe una hora precisa. El recordatorio de tu iPhone usará esta hora exacta." : "Choose an hour, minutes, and AM/PM—or type a precise time. Your iPhone reminder will use this exact time."}
+            {spanish ? "Elige una hora y minutos, o escribe una hora exacta en formato de 24 horas. El recordatorio de tu dispositivo usará esta hora exacta." : "Choose an hour, minutes, and AM/PM—or type a precise time. Your device reminder will use this exact time."}
           </Text>
         </View>
       )}
@@ -4716,11 +4722,17 @@ function ClockDial({
         {Array.from({ length: 12 }, (_, index) => index + 1).map((hour) => {
           const angle = ((hour % 12) * Math.PI) / 6 - Math.PI / 2;
           const radius = 82;
+          const clockHourLabel =
+            language === "es" && period === "PM"
+              ? hour === 12
+                ? 12
+                : hour + 12
+              : hour;
           return (
             <Pressable
               accessibilityRole="radio"
               accessibilityState={{ selected: displayHour === hour }}
-              accessibilityLabel={`${hour} ${period}`}
+              accessibilityLabel={language === "es" ? `${clockHourLabel} horas` : `${hour} ${period}`}
               key={hour}
               onPress={() =>
                 setTime(
@@ -4748,13 +4760,13 @@ function ClockDial({
                 monochrome && ! (displayHour === hour) && styles.monochromeText,
                 ]}
               >
-                {hour}
+                {clockHourLabel}
               </Text>
             </Pressable>
           );
         })}
         <Text style={[extraStyles.clockCenterText, largeText && styles.largeMenuText, monochrome && styles.monochromeText]}>
-          {formatReminderTime(clock.hour, clock.minute)}
+          {language === "es" ? `${String(clock.hour).padStart(2, "0")}:${String(clock.minute).padStart(2, "0")}` : formatReminderTime(clock.hour, clock.minute)}
         </Text>
       </View>
       <View style={extraStyles.clockMinuteRow}>
@@ -4788,7 +4800,7 @@ function ClockDial({
           <Pressable
             accessibilityRole="radio"
             accessibilityState={{ selected: period === nextPeriod }}
-            accessibilityLabel={nextPeriod}
+            accessibilityLabel={language === "es" ? (nextPeriod === "AM" ? "0 a 11 horas" : "12 a 23 horas") : nextPeriod}
             key={nextPeriod}
             onPress={() =>
               setTime(
@@ -4814,7 +4826,7 @@ function ClockDial({
                 monochrome && !(period === nextPeriod) && styles.monochromeText,
               ]}
             >
-              {nextPeriod}
+              {language === "es" ? (nextPeriod === "AM" ? "0–11" : "12–23") : nextPeriod}
             </Text>
           </Pressable>
         ))}
@@ -4844,7 +4856,7 @@ function DatePicker({
   const [visibleMonth, setVisibleMonth] = useState(() =>
     new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1),
   );
-  const monthLabel = visibleMonth.toLocaleDateString(spanish ? "es-US" : "en-US", {
+  const monthLabel = visibleMonth.toLocaleDateString(spanish ? "es-419" : "en-US", {
     month: "long",
     year: "numeric",
   });

@@ -1327,6 +1327,10 @@ export default function App() {
         .catch(() => undefined);
     return () => subscription.remove();
   }, [demoMode, doses, hydrated, settings.hideNotificationDetails, settings.language]);
+  const accessibilityPresentation = useMemo(
+    () => ({ largeText: settings.largeText, monochrome: settings.colorBlindMode }),
+    [settings.largeText, settings.colorBlindMode],
+  );
   const complete = doses.filter((dose) => dose.completed).length;
   const percentage = doses.length
     ? Math.round((complete / doses.length) * 100)

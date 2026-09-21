@@ -1845,7 +1845,18 @@ export default function App() {
     setHistory(demo.history);
     setTrackingStart(demo.trackingStart);
   }
-  function eraseRoutineData() {
+    function eraseRoutineData() {
+    if (demoMode) {
+      Alert.alert(
+        settings.language === "es"
+          ? "Desactiva el modo demo primero"
+          : "Turn off Demo Mode first",
+        settings.language === "es"
+          ? "Para proteger tu rutina real, sal del modo demo antes de borrar los datos locales."
+          : "To protect your real routine, turn off Demo Mode before erasing local data.",
+      );
+      return;
+    }
     void AsyncStorage.multiRemove([
       STORAGE_KEY,
       HISTORY_KEY,

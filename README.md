@@ -26,6 +26,7 @@ The current ClearCue app is the Expo project in [`mobile/`](mobile). It is the o
 - Clinician-safe “How to use drops” guide, including urgent-symptoms guidance
 - Accessibility defaults: large text across routine text, forms, dropdowns, time/date controls, and section labels; high contrast; VoiceOver labels; reduced motion; color-safe labels; and Spanish across the core routine, Settings, and Insights. An optional black-and-white mode removes color from key surfaces while retaining written medication and dose-status labels.
 - Demo Mode, onboarding, app icon/splash screen, and device-only privacy controls
+- Encrypted local routine storage with one-time migration from earlier prototype storage, plus strict runtime validation before saved data is used
 - Optional device lock for the medication plan using Face ID, Touch ID, or device passcode in a standalone iPhone build
 - A focused home screen that prioritizes today’s eye-drop routine; reports, privacy, and accessibility are grouped under More care tools
 
@@ -43,7 +44,7 @@ The current ClearCue app is the Expo project in [`mobile/`](mobile). It is the o
 
 ### Reliability and safety
 
-- Required clinician-plan confirmation, date/number checks, supply and spacing warnings, and clear self-reported-adherence language.
+- Required clinician-plan confirmation, bounded free-text fields, runtime data validation, date/number checks, supply and spacing warnings, and clear self-reported-adherence language.
 - iOS sheet transitions are sequenced to avoid overlapping screens; save, refresh, and Demo Mode actions guard against duplicate taps and background work stays non-interrupting.
 - Routine changes save immediately. When reminders are active, people choose when to refresh scheduled notifications.
 
@@ -64,7 +65,7 @@ Catalog changes are reviewed and shipped in app releases rather than downloaded 
 ## Next milestone
 
 - Establish a recurring review process for the bundled medication catalog and continue improving the focused eye-drop routine experience.
-- Evaluate optional device passcode or Face ID protection in a future TestFlight build if private prescription numbers or clinician details return.
+- Validate encrypted storage and optional device protection on a physical TestFlight build before release.
 
 ## Before TestFlight or release
 

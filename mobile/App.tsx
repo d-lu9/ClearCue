@@ -2,6 +2,7 @@ import { StatusBar } from "expo-status-bar";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as LocalAuthentication from "expo-local-authentication";
 import * as Notifications from "expo-notifications";
+import * as SecureStore from "expo-secure-store";
 import {
   CatalogMedication,
   MEDICATION_FILTERS,
@@ -137,6 +138,17 @@ const TRACKING_START_KEY = "clearcue-tracking-start-v1";
 const SETTINGS_KEY = "clearcue-accessibility-settings-v1";
 const ONBOARDING_KEY = "clearcue-onboarding-v1";
 const DEMO_MODE_KEY = "clearcue-demo-mode-v1";
+const SECURE_STORAGE_PREFIX = "clearcue.secure.";
+// Keep each Unicode chunk well below the smallest documented keychain-item limit.
+const SECURE_STORAGE_CHUNK_SIZE = 512;
+const MAX_ROUTINE_DOSES = 100;
+const MAX_HISTORY_LOGS = 5_000;
+const MAX_DAILY_REMINDERS = 24;
+const MAX_MEDICATION_NAME_LENGTH = 120;
+const MAX_CLINICIAN_TEXT_LENGTH = 1_000;
+const MAX_CONTACT_TEXT_LENGTH = 120;
+const MAX_RX_NUMBER_LENGTH = 80;
+const secureStorageQueues = new Map<string, Promise<void>>();
 const DEFAULT_SETTINGS: AppSettings = {
   largeText: true,
   highContrast: true,
@@ -146,6 +158,241 @@ const DEFAULT_SETTINGS: AppSettings = {
   appLockEnabled: false,
   language: "en",
 };
+
+type SecureManifest = { chunks: number };
+
+const secureStoreOptions = {
+  keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isString(value: unknown, maxLength: number): value is string {
+  return typeof value === "string" && value.length <= maxLength;
+}
+
+function parseJson(value: string): unknown | null {
+  try {
+    return JSON.parse(value) as unknown;
+  } catch {
+    return null;
+  }
+}
+
+function parseStoredSupply(value: unknown): Supply | undefined | null {
+  if (value === undefined) return undefined;
+  if (!isRecord(value)) return null;
+  const { bottleMl, dropsPerApplication, applicationsPerDay, openedOn, warningDays, dropsPerMl } = value;
+  if (
+    typeof bottleMl !== "number" || !Number.isFinite(bottleMl) || bottleMl <= 0 ||
+    typeof dropsPerApplication !== "number" || !Number.isFinite(dropsPerApplication) || dropsPerApplication <= 0 ||
+    typeof applicationsPerDay !== "number" || !Number.isInteger(applicationsPerDay) || applicationsPerDay <= 0 ||
+    !isString(openedOn, 10) || !isValidIsoDate(openedOn) ||
+    typeof warningDays !== "number" || !Number.isInteger(warningDays) || warningDays < 0 ||
+    typeof dropsPerMl !== "number" || !Number.isFinite(dropsPerMl) || dropsPerMl <= 0
+  ) return null;
+  return { bottleMl, dropsPerApplication, applicationsPerDay, openedOn, warningDays, dropsPerMl };
+}
+
+function parseStoredPrescription(value: unknown): PrescriptionDetails | undefined | null {
+  if (value === undefined) return undefined;
+  if (!isRecord(value)) return null;
+  const fields: Array<[keyof PrescriptionDetails, number]> = [
+    ["prescriber", MAX_CONTACT_TEXT_LENGTH],
+    ["prescriberPhone", 20],
+    ["pharmacy", MAX_CONTACT_TEXT_LENGTH],
+    ["pharmacyPhone", 20],
+    ["rxNumber", MAX_RX_NUMBER_LENGTH],
+    ["notes", MAX_CLINICIAN_TEXT_LENGTH],
+  ];
+  for (const [field, maxLength] of fields) {
+    const item = value[field];
+    if (item !== undefined && !isString(item, maxLength)) return null;
+  }
+  return {
+    prescriber: typeof value.prescriber === "string" ? value.prescriber : undefined,
+    prescriberPhone:
+      typeof value.prescriberPhone === "string" ? value.prescriberPhone : undefined,
+    pharmacy: typeof value.pharmacy === "string" ? value.pharmacy : undefined,
+    pharmacyPhone:
+      typeof value.pharmacyPhone === "string" ? value.pharmacyPhone : undefined,
+    rxNumber: typeof value.rxNumber === "string" ? value.rxNumber : undefined,
+    notes: typeof value.notes === "string" ? value.notes : undefined,
+  };
+}
+
+function parseStoredDose(value: unknown): Dose | null {
+  if (!isRecord(value)) return null;
+  if (
+    !isString(value.id, 128) || !value.id ||
+    !isString(value.name, MAX_MEDICATION_NAME_LENGTH) || !value.name.trim() ||
+    (value.eye !== "Left eye" && value.eye !== "Right eye" && value.eye !== "Both eyes") ||
+    !isString(value.color, 32) || !isString(value.time, 16) || !parseReminderTime(value.time) ||
+    typeof value.completed !== "boolean" ||
+    (value.scheduleGroupId !== undefined && !isString(value.scheduleGroupId, 128)) ||
+    (value.catalogId !== undefined && !isString(value.catalogId, 128)) ||
+    (value.taperPlan !== undefined && !isString(value.taperPlan, MAX_CLINICIAN_TEXT_LENGTH))
+  ) return null;
+  const supply = parseStoredSupply(value.supply);
+  const prescription = parseStoredPrescription(value.prescription);
+  if (supply === null || prescription === null) return null;
+  return {
+    id: value.id,
+    name: value.name,
+    eye: value.eye,
+    color: value.color,
+    time: value.time,
+    completed: value.completed,
+    scheduleGroupId: value.scheduleGroupId,
+    catalogId: value.catalogId,
+    taperPlan: value.taperPlan,
+    supply,
+    prescription,
+  };
+}
+
+function parseStoredDoses(value: unknown): Dose[] | null {
+  if (!Array.isArray(value) || value.length > MAX_ROUTINE_DOSES) return null;
+  const doses = value.map(parseStoredDose);
+  if (!doses.every((dose): dose is Dose => dose !== null)) return null;
+  if (new Set(doses.map((dose) => dose.id)).size !== doses.length) return null;
+  const groupCounts = new Map<string, number>();
+  for (const dose of doses) {
+    const groupId = dose.scheduleGroupId ?? dose.id;
+    const nextCount = (groupCounts.get(groupId) ?? 0) + 1;
+    if (nextCount > MAX_DAILY_REMINDERS) return null;
+    groupCounts.set(groupId, nextCount);
+  }
+  return doses;
+}
+
+function parseStoredHistory(value: unknown): DoseLog[] | null {
+  if (!Array.isArray(value) || value.length > MAX_HISTORY_LOGS) return null;
+  const history: DoseLog[] = [];
+  for (const item of value) {
+    if (
+      !isRecord(item) || !isString(item.doseId, 128) || !isString(item.date, 10) ||
+      !isValidIsoDate(item.date) ||
+      (item.status !== "taken" && item.status !== "late" && item.status !== "missed" && item.status !== "skipped") ||
+      (item.completedAt !== undefined && (!isString(item.completedAt, 40) || Number.isNaN(Date.parse(item.completedAt))))
+    ) return null;
+    history.push({ doseId: item.doseId, date: item.date, status: item.status, completedAt: item.completedAt });
+  }
+  return history;
+}
+
+function parseStoredSettings(value: unknown): AppSettings | null {
+  if (!isRecord(value)) return null;
+  const booleanKeys: Array<keyof Omit<AppSettings, "language">> = [
+    "largeText", "highContrast", "colorBlindMode", "reduceMotion", "hideNotificationDetails", "appLockEnabled",
+  ];
+  if (booleanKeys.some((key) => value[key] !== undefined && typeof value[key] !== "boolean")) return null;
+  if (value.language !== undefined && value.language !== "en" && value.language !== "es") return null;
+  return {
+    largeText: typeof value.largeText === "boolean" ? value.largeText : DEFAULT_SETTINGS.largeText,
+    highContrast:
+      typeof value.highContrast === "boolean" ? value.highContrast : DEFAULT_SETTINGS.highContrast,
+    colorBlindMode:
+      typeof value.colorBlindMode === "boolean" ? value.colorBlindMode : DEFAULT_SETTINGS.colorBlindMode,
+    reduceMotion:
+      typeof value.reduceMotion === "boolean" ? value.reduceMotion : DEFAULT_SETTINGS.reduceMotion,
+    hideNotificationDetails:
+      typeof value.hideNotificationDetails === "boolean"
+        ? value.hideNotificationDetails
+        : DEFAULT_SETTINGS.hideNotificationDetails,
+    appLockEnabled:
+      typeof value.appLockEnabled === "boolean"
+        ? value.appLockEnabled
+        : DEFAULT_SETTINGS.appLockEnabled,
+    language: value.language === "es" ? "es" : "en",
+  };
+}
+
+function cleanFreeText(value: string, maxLength: number) {
+  return value.replace(/\u0000/g, "").slice(0, maxLength);
+}
+
+function secureKey(key: string, suffix: string) {
+  return `${SECURE_STORAGE_PREFIX}${key}.${suffix}`;
+}
+
+async function secureSetJson(key: string, value: unknown) {
+  if (!(await SecureStore.isAvailableAsync())) throw new Error("Secure storage is unavailable");
+  const serialized = JSON.stringify(value);
+  const chunks = Array.from(
+    { length: Math.ceil(serialized.length / SECURE_STORAGE_CHUNK_SIZE) || 1 },
+    (_, index) => serialized.slice(index * SECURE_STORAGE_CHUNK_SIZE, (index + 1) * SECURE_STORAGE_CHUNK_SIZE),
+  );
+  const existingManifest = await SecureStore.getItemAsync(secureKey(key, "manifest"), secureStoreOptions);
+  const previous = existingManifest ? parseJson(existingManifest) : null;
+  const previousChunks = isRecord(previous) && typeof previous.chunks === "number" && Number.isInteger(previous.chunks) && previous.chunks >= 0 ? previous.chunks : 0;
+  await Promise.all(chunks.map((chunk, index) => SecureStore.setItemAsync(secureKey(key, String(index)), chunk, secureStoreOptions)));
+  await SecureStore.setItemAsync(secureKey(key, "manifest"), JSON.stringify({ chunks: chunks.length } satisfies SecureManifest), secureStoreOptions);
+  await Promise.all(Array.from({ length: Math.max(0, previousChunks - chunks.length) }, (_, index) => SecureStore.deleteItemAsync(secureKey(key, String(chunks.length + index)), secureStoreOptions)));
+}
+
+async function secureGetJson(key: string): Promise<unknown | null> {
+  if (!(await SecureStore.isAvailableAsync())) return null;
+  const manifestRaw = await SecureStore.getItemAsync(secureKey(key, "manifest"), secureStoreOptions);
+  if (!manifestRaw) return null;
+  const manifest = parseJson(manifestRaw);
+  if (!isRecord(manifest) || typeof manifest.chunks !== "number" || !Number.isInteger(manifest.chunks) || manifest.chunks < 1 || manifest.chunks > 10_000) return null;
+  const chunks = await Promise.all(Array.from({ length: manifest.chunks }, (_, index) => SecureStore.getItemAsync(secureKey(key, String(index)), secureStoreOptions)));
+  if (chunks.some((chunk) => chunk === null)) return null;
+  return parseJson(chunks.join(""));
+}
+
+async function secureRemove(key: string) {
+  const manifestRaw = await SecureStore.getItemAsync(secureKey(key, "manifest"), secureStoreOptions);
+  const manifest = manifestRaw ? parseJson(manifestRaw) : null;
+  const chunkCount = isRecord(manifest) && typeof manifest.chunks === "number" && Number.isInteger(manifest.chunks) ? manifest.chunks : 0;
+  await Promise.all([
+    SecureStore.deleteItemAsync(secureKey(key, "manifest"), secureStoreOptions),
+    ...Array.from({ length: chunkCount }, (_, index) => SecureStore.deleteItemAsync(secureKey(key, String(index)), secureStoreOptions)),
+  ]);
+}
+
+function queueSecureOperation(key: string, operation: () => Promise<void>) {
+  const previous = secureStorageQueues.get(key) ?? Promise.resolve();
+  const next = previous.catch(() => undefined).then(operation);
+  secureStorageQueues.set(key, next);
+  return next.finally(() => {
+    if (secureStorageQueues.get(key) === next) secureStorageQueues.delete(key);
+  });
+}
+
+function queueSecureSetJson(key: string, value: unknown) {
+  return queueSecureOperation(key, () => secureSetJson(key, value));
+}
+
+function queueSecureRemove(key: string) {
+  return queueSecureOperation(key, () => secureRemove(key));
+}
+
+async function readSecureOrMigrate<T>(
+  key: string,
+  parse: (value: unknown) => T | null,
+): Promise<T | null> {
+  const protectedValue = await secureGetJson(key);
+  if (protectedValue !== null) {
+    const parsed = parse(protectedValue);
+    if (parsed !== null) return parsed;
+    await secureRemove(key);
+    return null;
+  }
+  const legacyValue = await AsyncStorage.getItem(key);
+  if (!legacyValue) return null;
+  const parsed = parse(parseJson(legacyValue));
+  if (parsed === null) {
+    await AsyncStorage.removeItem(key);
+    return null;
+  }
+  await secureSetJson(key, parsed);
+  await AsyncStorage.removeItem(key);
+  return parsed;
+}
 const COLOR_NAMES: Record<string, { en: string; es: string }> = {
   "#35A7D9": { en: "Blue", es: "Azul" },
   "#E88C3A": { en: "Orange", es: "Naranja" },
@@ -1130,14 +1377,22 @@ export default function App() {
   useEffect(() => {
     async function restoreRoutine() {
       try {
-        const saved = await AsyncStorage.getItem(STORAGE_KEY);
-        const restoredDoses = saved
-          ? (JSON.parse(saved) as Dose[])
-          : STARTING_DOSES;
-        if (saved) setDoses(restoredDoses);
-        const savedHistory = await AsyncStorage.getItem(HISTORY_KEY);
-        const restoredHistory = savedHistory
-          ? (JSON.parse(savedHistory) as DoseLog[])
+        const [storedSettings, storedDoses, storedHistory, storedTrackingStart] =
+          await Promise.all([
+            readSecureOrMigrate(SETTINGS_KEY, parseStoredSettings),
+            readSecureOrMigrate(STORAGE_KEY, parseStoredDoses),
+            readSecureOrMigrate(HISTORY_KEY, parseStoredHistory),
+            readSecureOrMigrate(TRACKING_START_KEY, (value) =>
+              isString(value, 10) && isValidIsoDate(value) ? value : null,
+            ),
+          ]);
+        const restoredSettings = storedSettings ?? DEFAULT_SETTINGS;
+        setSettings(restoredSettings);
+        setAppLocked(restoredSettings.appLockEnabled);
+        const restoredDoses = storedDoses ?? STARTING_DOSES;
+        const validDoseIds = new Set(restoredDoses.map((dose) => dose.id));
+        const restoredHistory = (storedHistory
+          ? storedHistory
           : restoredDoses
               .filter((dose) => dose.completed)
               .map((dose) => ({
@@ -1145,7 +1400,8 @@ export default function App() {
                 date: dateKey(new Date()),
                 status: "taken" as const,
                 completedAt: new Date().toISOString(),
-              }));
+              })))
+          .filter((log) => validDoseIds.has(log.doseId));
         setHistory(restoredHistory);
         const today = dateKey(new Date());
         setDoses(
@@ -1156,18 +1412,8 @@ export default function App() {
             ),
           })),
         );
-        const savedTrackingStart =
-          await AsyncStorage.getItem(TRACKING_START_KEY);
-        if (savedTrackingStart) setTrackingStart(savedTrackingStart);
-        const savedSettings = await AsyncStorage.getItem(SETTINGS_KEY);
-        if (savedSettings) {
-          const restoredSettings = {
-            ...DEFAULT_SETTINGS,
-            ...(JSON.parse(savedSettings) as AppSettings),
-          };
-          setSettings(restoredSettings);
-          setAppLocked(restoredSettings.appLockEnabled);
-        } else if (await AccessibilityInfo.isReduceMotionEnabled())
+        if (storedTrackingStart) setTrackingStart(storedTrackingStart);
+        if (!storedSettings && await AccessibilityInfo.isReduceMotionEnabled())
           setSettings((current) => ({ ...current, reduceMotion: true }));
         if (!(await AsyncStorage.getItem(ONBOARDING_KEY)))
           setOnboardingVisible(true);
@@ -1200,25 +1446,25 @@ export default function App() {
   }, []);
   useEffect(() => {
     if (hydrated && !demoMode)
-      void AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(doses)).catch(
+      void queueSecureSetJson(STORAGE_KEY, doses).catch(
         () => undefined,
       );
   }, [doses, hydrated, demoMode]);
   useEffect(() => {
     if (hydrated && !demoMode)
-      void AsyncStorage.setItem(HISTORY_KEY, JSON.stringify(history)).catch(
+      void queueSecureSetJson(HISTORY_KEY, history).catch(
         () => undefined,
       );
   }, [history, hydrated, demoMode]);
   useEffect(() => {
     if (hydrated && !demoMode)
-      void AsyncStorage.setItem(TRACKING_START_KEY, trackingStart).catch(
+      void queueSecureSetJson(TRACKING_START_KEY, trackingStart).catch(
         () => undefined,
       );
   }, [trackingStart, hydrated, demoMode]);
   useEffect(() => {
     if (hydrated)
-      void AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)).catch(
+      void queueSecureSetJson(SETTINGS_KEY, settings).catch(
         () => undefined,
       );
   }, [settings, hydrated]);
@@ -1291,7 +1537,8 @@ export default function App() {
       const action = response.actionIdentifier;
       if (
         typeof doseId !== "string" ||
-        !["TAKEN", "SKIP", "SNOOZE"].includes(action)
+        !["TAKEN", "SKIP", "SNOOZE"].includes(action) ||
+        !doses.some((dose) => dose.id === doseId)
       )
         return;
       const responseKey = `${response.notification.request.identifier}:${action}`;
@@ -1381,18 +1628,20 @@ export default function App() {
           : item,
       ),
     );
-    setHistory((current) => [
-      ...current.filter((log) => !(log.doseId === id && log.date === today)),
-      {
-        doseId: id,
-        date: today,
-        status,
-        completedAt:
-          status === "missed" || status === "skipped"
-            ? undefined
-            : new Date().toISOString(),
-      },
-    ]);
+    setHistory((current) =>
+      [
+        ...current.filter((log) => !(log.doseId === id && log.date === today)),
+        {
+          doseId: id,
+          date: today,
+          status,
+          completedAt:
+            status === "missed" || status === "skipped"
+              ? undefined
+              : new Date().toISOString(),
+        },
+      ].slice(-MAX_HISTORY_LOGS),
+    );
   }
   function toggleDose(id: string) {
     const dose = doses.find((item) => item.id === id);
@@ -1421,6 +1670,13 @@ export default function App() {
       return;
     }
     const allTimes = [time, ...additionalTimes];
+    if (allTimes.length > MAX_DAILY_REMINDERS) {
+      setRoutineFormNotice({
+        title: settings.language === "es" ? "Demasiados recordatorios" : "Too many reminders",
+        message: settings.language === "es" ? "Limita esta rutina a 24 recordatorios diarios." : "Limit this routine to 24 daily reminders.",
+      });
+      return;
+    }
     if (allTimes.some((item) => !parseReminderTime(item))) {
       setRoutineFormNotice({
         title: settings.language === "es" ? "Usa una hora como 8:00 AM" : "Use a time like 8:00 AM",
@@ -1814,17 +2070,17 @@ export default function App() {
       const [savedDoses, savedHistory, savedTracking] = saved
         ? [null, null, null]
         : await Promise.all([
-            AsyncStorage.getItem(STORAGE_KEY),
-            AsyncStorage.getItem(HISTORY_KEY),
-            AsyncStorage.getItem(TRACKING_START_KEY),
+            readSecureOrMigrate(STORAGE_KEY, parseStoredDoses),
+            readSecureOrMigrate(HISTORY_KEY, parseStoredHistory),
+            readSecureOrMigrate(TRACKING_START_KEY, (value) =>
+              isString(value, 10) && isValidIsoDate(value) ? value : null,
+            ),
           ]);
       setDoses(
-        saved?.doses ??
-          (savedDoses ? (JSON.parse(savedDoses) as Dose[]) : STARTING_DOSES),
+        saved?.doses ?? savedDoses ?? STARTING_DOSES,
       );
       setHistory(
-        saved?.history ??
-          (savedHistory ? (JSON.parse(savedHistory) as DoseLog[]) : []),
+        saved?.history ?? savedHistory ?? [],
       );
       setTrackingStart(
         saved?.trackingStart ?? savedTracking ?? dateKey(new Date()),
@@ -1867,11 +2123,16 @@ export default function App() {
       );
       return;
     }
-    void AsyncStorage.multiRemove([
-      STORAGE_KEY,
-      HISTORY_KEY,
-      TRACKING_START_KEY,
-      ONBOARDING_KEY,
+    void Promise.all([
+      queueSecureRemove(STORAGE_KEY),
+      queueSecureRemove(HISTORY_KEY),
+      queueSecureRemove(TRACKING_START_KEY),
+      AsyncStorage.multiRemove([
+        STORAGE_KEY,
+        HISTORY_KEY,
+        TRACKING_START_KEY,
+        ONBOARDING_KEY,
+      ]),
     ]).catch(() => undefined);
     void Notifications.cancelAllScheduledNotificationsAsync().catch(() =>
       undefined,
@@ -1934,6 +2195,33 @@ export default function App() {
     if (!(await authenticateAppLock())) return;
     setSettings((current) => ({ ...current, appLockEnabled: true }));
     setAppLocked(false);
+  }
+  if (!hydrated) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <StatusBar style="dark" />
+        <View style={extraStyles.appLockContent}>
+          <Text style={extraStyles.splashTitle}>ClearCue</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+  if (settings.appLockEnabled && appLocked) {
+    return (
+      <AccessibilityPresentationContext.Provider
+        value={{ largeText: settings.largeText, monochrome: settings.colorBlindMode }}
+      >
+        <AppLockModal
+          visible
+          language={settings.language}
+          onUnlock={() =>
+            void authenticateAppLock().then((success) => {
+              if (success) setAppLocked(false);
+            })
+          }
+        />
+      </AccessibilityPresentationContext.Provider>
+    );
   }
   return (
     <AccessibilityPresentationContext.Provider
@@ -2196,7 +2484,7 @@ export default function App() {
           formNotice={routineFormNotice}
           selectedMedication={selectedMedication}
           onName={(value) => {
-            setName(value);
+            setName(cleanFreeText(value, MAX_MEDICATION_NAME_LENGTH));
             setSelectedMedication(null);
           }}
           onSelectMedication={(medication) => {
@@ -2204,18 +2492,30 @@ export default function App() {
             setName(medication.genericName);
           }}
           onTime={setTime}
-          onAdditionalTimes={setAdditionalTimes}
-          onClinicianInstructions={setTaperPlan}
-          onPrescriber={setPrescriber}
+          onAdditionalTimes={(values) =>
+            setAdditionalTimes(values.slice(0, MAX_DAILY_REMINDERS - 1))
+          }
+          onClinicianInstructions={(value) =>
+            setTaperPlan(cleanFreeText(value, MAX_CLINICIAN_TEXT_LENGTH))
+          }
+          onPrescriber={(value) =>
+            setPrescriber(cleanFreeText(value, MAX_CONTACT_TEXT_LENGTH))
+          }
           onPrescriberPhone={(value) =>
             setPrescriberPhone(value.replace(/[^0-9+() -]/g, "").slice(0, 20))
           }
-          onPharmacy={setPharmacy}
+          onPharmacy={(value) =>
+            setPharmacy(cleanFreeText(value, MAX_CONTACT_TEXT_LENGTH))
+          }
           onPharmacyPhone={(value) =>
             setPharmacyPhone(value.replace(/[^0-9+() -]/g, "").slice(0, 20))
           }
-          onRxNumber={setRxNumber}
-          onPersonalNotes={setPersonalNotes}
+          onRxNumber={(value) =>
+            setRxNumber(cleanFreeText(value, MAX_RX_NUMBER_LENGTH))
+          }
+          onPersonalNotes={(value) =>
+            setPersonalNotes(cleanFreeText(value, MAX_CLINICIAN_TEXT_LENGTH))
+          }
           onBottleMl={(value) => setBottleMl(value.replace(/[^0-9.]/g, ""))}
           onDropsPerApplication={(value) =>
             setDropsPerApplication(value.replace(/[^0-9.]/g, ""))
@@ -2388,15 +2688,6 @@ export default function App() {
         animation={settings.reduceMotion ? "none" : "slide"}
         language={settings.language}
         onClose={() => setGuideOpen(false)}
-      />
-      <AppLockModal
-        visible={hydrated && appLocked}
-        language={settings.language}
-        onUnlock={() =>
-          void authenticateAppLock().then((success) => {
-            if (success) setAppLocked(false);
-          })
-        }
       />
       <OnboardingModal
         visible={onboardingVisible}
@@ -4070,6 +4361,7 @@ function AddMedicationModal(props: ModalProps) {
                 props.onName(value);
               }}
               placeholder={props.language === "es" ? "Nombre genérico, marca o nombre común" : "Generic, brand, or common name"}
+              maxLength={MAX_MEDICATION_NAME_LENGTH}
               placeholderTextColor="#81969A"
               style={styles.input}
             />
@@ -4320,6 +4612,7 @@ function AddMedicationModal(props: ModalProps) {
               placeholder={spanish ? "Copia las instrucciones de tu profesional o de la etiqueta" : "Copy the instructions from your clinician or prescription label"}
               placeholderTextColor="#81969A"
               multiline
+              maxLength={MAX_CLINICIAN_TEXT_LENGTH}
               style={[
                 styles.input,
                 { height: 78, paddingTop: 12, textAlignVertical: "top" },
@@ -4339,6 +4632,7 @@ function AddMedicationModal(props: ModalProps) {
                 value={props.prescriber}
                 onChangeText={props.onPrescriber}
                 placeholder={spanish ? "p. ej., Dra. Rivera" : "e.g. Dr. Rivera"}
+                maxLength={MAX_CONTACT_TEXT_LENGTH}
                 placeholderTextColor="#81969A"
                 style={styles.input}
               />
@@ -4362,6 +4656,7 @@ function AddMedicationModal(props: ModalProps) {
                 value={props.pharmacy}
                 onChangeText={props.onPharmacy}
                 placeholder={spanish ? "p. ej., Farmacia Central" : "e.g. Main Street Pharmacy"}
+                maxLength={MAX_CONTACT_TEXT_LENGTH}
                 placeholderTextColor="#81969A"
                 style={styles.input}
               />
@@ -4385,6 +4680,7 @@ function AddMedicationModal(props: ModalProps) {
                 value={props.rxNumber}
                 onChangeText={props.onRxNumber}
                 placeholder={spanish ? "Opcional" : "Optional"}
+                maxLength={MAX_RX_NUMBER_LENGTH}
                 placeholderTextColor="#81969A"
                 style={styles.input}
               />
@@ -4397,6 +4693,7 @@ function AddMedicationModal(props: ModalProps) {
                 placeholder={spanish ? "Recordatorio opcional para ti" : "Optional reminder for yourself"}
                 placeholderTextColor="#81969A"
                 multiline
+                maxLength={MAX_CLINICIAN_TEXT_LENGTH}
                 style={[
                   styles.input,
                   { height: 70, paddingTop: 12, textAlignVertical: "top" },
@@ -4687,6 +4984,7 @@ function TimePicker({
             value={spanish ? displayReminderTime(value, language) : value}
             onChangeText={onChange}
             placeholder={spanish ? "O escribe, por ejemplo, 20:30" : "Or type e.g. 8:30 AM"}
+            maxLength={16}
             placeholderTextColor="#81969A"
             style={styles.input}
           />

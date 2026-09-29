@@ -2400,7 +2400,9 @@ export default function App() {
               </Text>
               <Text style={[styles.reminderText, scaleText, settings.colorBlindMode && styles.monochromeText]}>
                 {remindersEnabled && remindersNeedRefresh
-                  ? "Routine changes are saved. Refresh reminders when you are ready."
+                  ? settings.language === "es"
+                    ? "Los cambios de la rutina están guardados. Actualiza los recordatorios cuando estés listo."
+                    : "Routine changes are saved. Refresh reminders when you are ready."
                   : remindersEnabled
                   ? settings.language === "es"
                     ? "Los recordatorios de ClearCue están activos."
@@ -2413,7 +2415,13 @@ export default function App() {
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={
-                remindersNeedRefresh ? "Refresh ClearCue reminders" : remindersEnabled ? copy.synced : copy.enable
+                remindersNeedRefresh
+                  ? settings.language === "es"
+                    ? "Actualizar los recordatorios de ClearCue"
+                    : "Refresh ClearCue reminders"
+                  : remindersEnabled
+                    ? copy.synced
+                    : copy.enable
               }
               onPress={() => void enableReminders()}
               style={[
@@ -2424,7 +2432,9 @@ export default function App() {
             >
               <Text style={styles.reminderButtonText}>
                 {remindersNeedRefresh
-                  ? "Refresh"
+                  ? settings.language === "es"
+                    ? "Actualizar"
+                    : "Refresh"
                   : remindersEnabled
                     ? copy.synced
                     : copy.enable}

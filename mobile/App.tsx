@@ -894,7 +894,7 @@ const extraStyles = StyleSheet.create({
   missedDoseActions: { flexDirection: "row", gap: 8 },
   missedDoseActionsLarge: { flexDirection: "column" },
   missedDoseAction: { flex: 1, minHeight: 44, justifyContent: "center" },
-  reminderCheckup: { marginTop: -8 },
+  reminderCheckup: { marginTop: 18 },
   reminderCheckupResult: {
     backgroundColor: "#E7F0E9",
     borderRadius: 12,
@@ -1341,8 +1341,9 @@ export default function App() {
   const [reminderCheckup, setReminderCheckup] = useState<ReminderCheckup | null>(null);
   const [history, setHistory] = useState<DoseLog[]>([]);
   const homePagerRef = useRef<ScrollView>(null);
-  const [homePage, setHomePage] = useState(0);
+  const [homePage, setHomePage] = useState<0 | 1>(0);
   const [homePagerWidth, setHomePagerWidth] = useState(0);
+  const [homePageHeights, setHomePageHeights] = useState<[number, number]>([0, 0]);
   const [trackingStart, setTrackingStart] = useState(dateKey(new Date()));
   const [reportOpen, setReportOpen] = useState(false);
   const [routineReviewOpen, setRoutineReviewOpen] = useState(false);
@@ -2211,6 +2212,14 @@ export default function App() {
       animated: !settings.reduceMotion,
     });
   }
+  function measureHomePage(page: 0 | 1, height: number) {
+    setHomePageHeights((current) => {
+      if (current[page] === height) return current;
+      const next: [number, number] = [...current];
+      next[page] = height;
+      return next;
+    });
+  }
   async function authenticateAppLock() {
     try {
       const [hasHardware, isEnrolled] = await Promise.all([
@@ -2408,6 +2417,8 @@ export default function App() {
                 horizontal
                 pagingEnabled
                 directionalLockEnabled
+                contentContainerStyle={styles.homePagerContent}
+                style={homePageHeights[homePage] > 0 ? { height: homePageHeights[homePage] } : undefined}
                 showsHorizontalScrollIndicator={false}
                 scrollEventThrottle={16}
                 onMomentumScrollEnd={(event) =>
@@ -2421,7 +2432,10 @@ export default function App() {
                   )
                 }
               >
-                <View style={[styles.homePage, { width: homePagerWidth }]}>
+                <View
+                  style={[styles.homePage, { width: homePagerWidth }]}
+                  onLayout={(event) => measureHomePage(0, event.nativeEvent.layout.height)}
+                >
                   <View style={styles.sectionHeader}>
                     <View>
                       <AccentLabel>{copy.next}</AccentLabel>
@@ -2526,7 +2540,10 @@ export default function App() {
                     </View>
                   </View>
                 </View>
-                <View style={[styles.homePage, { width: homePagerWidth }]}>
+                <View
+                  style={[styles.homePage, { width: homePagerWidth }]}
+                  onLayout={(event) => measureHomePage(1, event.nativeEvent.layout.height)}
+                >
                   <AdherencePanel
                     data={adherence}
                     onGenerateReport={() => setReportOpen(true)}
@@ -5594,7 +5611,8 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   homePager: { width: "100%" },
-  homePage: { flexGrow: 1 },
+  homePagerContent: { alignItems: "flex-start" },
+  homePage: { alignSelf: "flex-start" },
   homePageDots: {
     flexDirection: "row",
     justifyContent: "center",

@@ -62,6 +62,7 @@ The current ClearCue app is the Expo project in [`mobile/`](mobile). It is the o
 - Required clinician-plan confirmation, bounded free-text fields, runtime data validation, date/number checks, supply and spacing warnings, and clear self-reported-adherence language.
 - iOS sheet transitions are sequenced to avoid overlapping screens; save, refresh, and Demo Mode actions guard against duplicate taps and background work stays non-interrupting.
 - Routine changes save immediately. When reminders are active, people choose when to refresh scheduled notifications.
+- Expo 57-compatible dependency patches and a narrowly scoped Xcode UUID override remove the critical and moderate npm audit findings. The remaining 15 high findings are transitive through Expo/Metro tooling (`braces` and `node-forge`); neither has a published patched version as of October 2026. Do not use `npm audit fix --force`, which proposes an incompatible Expo downgrade.
 
 ### Product focus
 

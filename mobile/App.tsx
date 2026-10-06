@@ -3,6 +3,8 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as LocalAuthentication from "expo-local-authentication";
 import * as Notifications from "expo-notifications";
 import * as SecureStore from "expo-secure-store";
+import { CaregiverModal } from "./CaregiverModal";
+import { CaregiverRecord, CaregiverSchedule, deletePatientConnection } from "./caregiver";
 import {
   CatalogMedication,
   MEDICATION_FILTERS,
@@ -1323,6 +1325,7 @@ export default function App() {
   const demoTransitionInProgress = useRef(false);
   const reminderUpdateInProgress = useRef(false);
   const routineSaveInProgress = useRef(false);
+  const eraseInProgress = useRef(false);
   const handledNotificationResponses = useRef(new Set<string>());
   const previousLanguage = useRef(DEFAULT_SETTINGS.language);
   const personalSnapshot = useRef<{
@@ -1356,6 +1359,8 @@ export default function App() {
   const [reportDays, setReportDays] = useState<7 | 30>(7);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [privacyOpen, setPrivacyOpen] = useState(false);
+  const [caregiverOpen, setCaregiverOpen] = useState(false);
+  const [showCaregiverAfterPrivacy, setShowCaregiverAfterPrivacy] = useState(false);
   const [guideOpen, setGuideOpen] = useState(false);
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [appLocked, setAppLocked] = useState(false);
@@ -1605,6 +1610,15 @@ export default function App() {
   );
   const historyDose = doses.find((dose) => dose.id === historyDoseId) ?? null;
   const routineGroups = useMemo(() => groupRoutineDoses(doses), [doses]);
+  const caregiverSchedule = useMemo<CaregiverSchedule[]>(() => doses.flatMap((dose) => {
+    const time = parseReminderTime(dose.time);
+    return time ? [{ id: dose.id, minuteOfDay: time.hour * 60 + time.minute }] : [];
+  }), [doses]);
+  const caregiverRecords = useMemo<CaregiverRecord[]>(() => history
+    .filter((log): log is DoseLog & { status: CaregiverRecord["status"] } =>
+      log.status === "taken" || log.status === "late" || log.status === "skipped")
+    .slice(-200)
+    .map((log) => ({ doseId: log.doseId, date: log.date, status: log.status })), [history]);
   const copy = COPY[settings.language];
   const scaleText = settings.largeText ? styles.largeText : undefined;
   const scaleHeading = settings.largeText
@@ -2114,7 +2128,8 @@ export default function App() {
     setHistory(demo.history);
     setTrackingStart(demo.trackingStart);
   }
-    function eraseRoutineData() {
+  async function eraseRoutineData() {
+    if (eraseInProgress.current) return;
     if (demoMode) {
       Alert.alert(
         settings.language === "es"
@@ -2123,6 +2138,19 @@ export default function App() {
         settings.language === "es"
           ? "Para proteger tu rutina real, sal del modo demo antes de borrar los datos locales."
           : "To protect your real routine, turn off Demo Mode before erasing local data.",
+      );
+      return;
+    }
+    eraseInProgress.current = true;
+    try {
+      await deletePatientConnection();
+    } catch {
+      eraseInProgress.current = false;
+      Alert.alert(
+        settings.language === "es" ? "No se pudo detener el uso compartido" : "Could not stop sharing",
+        settings.language === "es"
+          ? "Conéctate a Internet y vuelve a intentarlo para revocar primero el acceso del cuidador. No se borraron tus datos locales."
+          : "Connect to the internet and try again to revoke caregiver access first. Your local data was not erased.",
       );
       return;
     }
@@ -2147,6 +2175,7 @@ export default function App() {
     setRemindersNeedRefresh(false);
     setShowOnboardingAfterPrivacy(true);
     setPrivacyOpen(false);
+    eraseInProgress.current = false;
   }
   function openInsights() {
     setHomePage(1);
@@ -2715,14 +2744,32 @@ export default function App() {
         appLockEnabled={settings.appLockEnabled}
         onAppLockChange={(value) => void changeAppLock(value)}
         onErase={eraseRoutineData}
+        onCaregiver={() => {
+          setShowCaregiverAfterPrivacy(true);
+          setPrivacyOpen(false);
+        }}
         onClose={() => setPrivacyOpen(false)}
         onDismiss={() => {
+          if (showCaregiverAfterPrivacy) {
+            setShowCaregiverAfterPrivacy(false);
+            setCaregiverOpen(true);
+          }
           if (showOnboardingAfterPrivacy) {
             setShowOnboardingAfterPrivacy(false);
             setOnboardingStep(0);
             setOnboardingVisible(true);
           }
         }}
+      />
+      <CaregiverModal
+        visible={caregiverOpen}
+        language={settings.language}
+        largeText={settings.largeText}
+        monochrome={settings.colorBlindMode}
+        demoMode={demoMode}
+        schedule={caregiverSchedule}
+        records={caregiverRecords}
+        onClose={() => setCaregiverOpen(false)}
       />
       <SettingsModal
         visible={settingsOpen}
@@ -3749,6 +3796,7 @@ function PrivacyModal({
   appLockEnabled,
   onAppLockChange,
   onErase,
+  onCaregiver,
   onClose,
   onDismiss,
 }: {
@@ -3759,11 +3807,13 @@ function PrivacyModal({
   onHideNotificationDetails: (value: boolean) => void;
   appLockEnabled: boolean;
   onAppLockChange: (value: boolean) => void;
-  onErase: () => void;
+  onErase: () => Promise<void>;
+  onCaregiver: () => void;
   onClose: () => void;
   onDismiss: () => void;
 }) {
   const [eraseConfirming, setEraseConfirming] = useState(false);
+  const [erasing, setErasing] = useState(false);
   const spanish = language === "es";
   return (
     <Modal
@@ -3792,8 +3842,15 @@ function PrivacyModal({
           <View style={styles.note}>
             <Text style={styles.noteTitle}>{spanish ? "Local por defecto" : "Local by default"}</Text>
             <Text style={styles.noteText}>
-              {spanish ? "ClearCue guarda tu rutina, detalles de medicamentos e historial de seguimiento en este dispositivo. No tiene cuenta de ClearCue, sincronización en la nube ni monitoreo de cuidadores." : "ClearCue stores your routine, medication details, and adherence history on this device. It has no ClearCue account, cloud sync, or caregiver monitoring."}
+              {spanish ? "ClearCue guarda tu rutina, detalles de medicamentos e historial en este dispositivo. Las alertas opcionales para cuidadores comparten solo horarios e información de registro, nunca nombres de medicamentos ni recetas." : "ClearCue stores your routine, medication details, and history on this device. Optional caregiver alerts share only dose times and recorded status, never medication names or prescription details."}
             </Text>
+          </View>
+          <View style={styles.note}>
+            <Text style={styles.noteTitle}>{spanish ? "Alertas opcionales para cuidadores" : "Optional caregiver alerts"}</Text>
+            <Text style={styles.noteText}>{spanish ? "Conecta dos dispositivos sin cuentas y controla o revoca el acceso cuando quieras." : "Connect two devices without accounts, and check or revoke access whenever you want."}</Text>
+            <Pressable accessibilityRole="button" accessibilityLabel={spanish ? "Abrir alertas para cuidadores" : "Open caregiver alerts"} onPress={onCaregiver} style={extraStyles.welcomeGuideButton}>
+              <Text style={extraStyles.cardLink}>{spanish ? "Abrir alertas para cuidadores" : "Open caregiver alerts"}</Text>
+            </Pressable>
           </View>
           <SettingRow
             title={spanish ? "Ocultar detalles de medicamentos en notificaciones" : "Hide medication details in notifications"}
@@ -3829,7 +3886,7 @@ function PrivacyModal({
           <View style={extraStyles.eraseSection}>
             <Text style={extraStyles.eraseTitle}>{spanish ? "Borrar datos locales de la rutina" : "Erase local routine data"}</Text>
             <Text style={extraStyles.eraseText}>
-              {spanish ? "Esto elimina tus medicamentos, detalles privados de receta, historial de dosis y notificaciones programadas de ClearCue de este dispositivo. No se puede deshacer." : "This removes your medications, private prescription details, dose history, and scheduled ClearCue notifications from this device. It cannot be undone."}
+              {spanish ? "Esto revoca primero el acceso del cuidador y borra los datos compartidos, luego elimina medicamentos, detalles privados de receta, historial y notificaciones de este dispositivo. Requiere Internet si compartes tu rutina. No se puede deshacer." : "This first revokes caregiver access and deletes shared data, then removes medications, private prescription details, history, and notifications from this device. Internet is required if you share your routine. It cannot be undone."}
             </Text>
             {eraseConfirming ? (
               <View style={extraStyles.deleteConfirm}>
@@ -3849,10 +3906,14 @@ function PrivacyModal({
                   <Pressable
                     accessibilityRole="button"
                     accessibilityLabel={spanish ? "Confirmar borrado de datos locales de la rutina de ClearCue" : "Confirm erasing local ClearCue routine data"}
-                    onPress={onErase}
+                    disabled={erasing}
+                    onPress={() => {
+                      setErasing(true);
+                      void onErase().finally(() => setErasing(false));
+                    }}
                     style={extraStyles.deleteConfirmButton}
                   >
-                    <Text style={extraStyles.deleteConfirmButtonText}>{spanish ? "Borrar datos" : "Erase data"}</Text>
+                    <Text style={extraStyles.deleteConfirmButtonText}>{erasing ? (spanish ? "Borrando…" : "Erasing…") : (spanish ? "Borrar datos" : "Erase data")}</Text>
                   </Pressable>
                 </View>
               </View>

@@ -31,7 +31,7 @@ The current ClearCue app is the Expo project in [`mobile/`](mobile). It is the o
 
 ## Current features
 
-- Local-only eye-drop routines, medication details, refill estimates, and adherence data
+- Local-by-default eye-drop routines, medication details, refill estimates, and adherence data
 - Multiple daily reminder times for a single medication, with safe spacing warnings
 - Validated supply-estimate fields, date checks, and a required clinician-plan confirmation before routine changes are saved
 - Time picker, medication search, brand/alias support, category filters, and a reviewed offline catalog of common glaucoma, dry-eye, allergy, and clinician-directed post-operative drops
@@ -42,6 +42,7 @@ The current ClearCue app is the Expo project in [`mobile/`](mobile). It is the o
 - Encrypted local routine storage with one-time migration from earlier prototype storage, plus strict runtime validation before saved data is used
 - Optional device lock for the medication plan using Face ID, Touch ID, or device passcode in a standalone iPhone build
 - A focused home screen that prioritizes today’s eye-drop routine; swipe between Today and Insights instead of scrolling through both, with reports, privacy, and accessibility grouped under More care tools
+- Optional accountless caregiver pairing is implemented but inactive until its separate alert service and a new standalone build are configured; it shares minimal schedule/status data and sends generic, non-clinical push alerts
 
 ## Release highlights
 
@@ -79,6 +80,7 @@ Catalog changes are reviewed and shipped in app releases rather than downloaded 
 
 - Establish a recurring review process for the bundled medication catalog and continue improving the focused eye-drop routine experience.
 - Validate encrypted storage and optional device protection on a physical TestFlight build before release.
+- Deploy and test the optional [caregiver alert service](caregiver-service/README.md) on two real phones before enabling it in a build; the current TestFlight build does not contain a configured service.
 
 ## Before TestFlight or release
 

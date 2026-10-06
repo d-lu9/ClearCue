@@ -859,6 +859,7 @@ const extraStyles = StyleSheet.create({
   medicationTop: { flexDirection: "row", gap: 12 },
   timeBlock: { alignItems: "flex-end", gap: 6 },
   groupedTimes: { marginTop: 14, gap: 9 },
+  groupedTimeItem: { gap: 9 },
   groupedTimeRow: {
     borderTopWidth: 1,
     borderTopColor: "#F2EBE4",
@@ -887,6 +888,8 @@ const extraStyles = StyleSheet.create({
   },
   missedDoseSafetyText: { color: "#704D30", fontSize: 13, lineHeight: 18 },
   missedDoseActions: { flexDirection: "row", gap: 8 },
+  missedDoseActionsLarge: { flexDirection: "column" },
+  missedDoseAction: { flex: 1, minHeight: 44, justifyContent: "center" },
   reminderCheckup: { marginTop: -8 },
   reminderCheckupResult: {
     backgroundColor: "#E7F0E9",
@@ -2999,76 +3002,78 @@ function DoseCard({
                         ? "Próxima"
                         : "Upcoming";
             return (
-              <View key={scheduledDose.id} style={extraStyles.groupedTimeRow}>
-                <View style={extraStyles.timeBlock}>
-                  <Text style={[styles.time, largeText && styles.largeText, monochrome && styles.monochromeText]}>
-                    {displayReminderTime(scheduledDose.time, language)}
-                  </Text>
-                  <Text
-                    style={[
-                      extraStyles.statusBadge,
-                      state === "completed"
-                        ? extraStyles.statusComplete
-                        : state === "late" || state === "skipped"
-                          ? extraStyles.statusLate
-                          : extraStyles.statusDue,
-                      monochrome && extraStyles.monochromeStatusBadge,
-                    ]}
-                  >
-                    {status}
-                  </Text>
-                </View>
-                <View style={extraStyles.cardLinks}>
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel={language === "es" ? `Ver historial de ${dose.name} para las ${displayReminderTime(scheduledDose.time, language)}` : `View ${dose.name} history for ${scheduledDose.time}`}
-                    onPress={() => onHistory(scheduledDose.id)}
-                  >
-                    <Text style={[extraStyles.cardLink, largeText && styles.largeCardLink, monochrome && extraStyles.monochromeText]}>
-                      {language === "es" ? "Historial" : "History"}
+              <View key={scheduledDose.id} style={extraStyles.groupedTimeItem}>
+                <View style={extraStyles.groupedTimeRow}>
+                  <View style={extraStyles.timeBlock}>
+                    <Text style={[styles.time, largeText && styles.largeText, monochrome && styles.monochromeText]}>
+                      {displayReminderTime(scheduledDose.time, language)}
                     </Text>
-                  </Pressable>
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel={language === "es" ? `${state === "completed" ? "Marcar como no tomada" : "Marcar como tomada"}: ${dose.name} a las ${displayReminderTime(scheduledDose.time, language)}` : `${state === "completed" ? "Mark incomplete" : "Mark as taken"}: ${dose.name} at ${scheduledDose.time}`}
-                    accessibilityHint={language === "es" ? "Registra esta dosis en el historial de seguimiento" : "Records this dose in adherence history"}
-                    onPress={() => onToggle(scheduledDose.id)}
-                    style={[styles.doneButton, state === "completed" && styles.checkedButton, monochrome && styles.monochromeButton]}
-                  >
-                    <Text style={styles.doneText}>
-                      {state === "completed"
-                        ? language === "es"
-                          ? "✓ Tomada"
-                          : "✓ Taken"
-                        : language === "es"
-                          ? "Marcar tomada"
-                          : "Mark taken"}
+                    <Text
+                      style={[
+                        extraStyles.statusBadge,
+                        state === "completed"
+                          ? extraStyles.statusComplete
+                          : state === "late" || state === "skipped"
+                            ? extraStyles.statusLate
+                            : extraStyles.statusDue,
+                        monochrome && extraStyles.monochromeStatusBadge,
+                      ]}
+                    >
+                      {status}
                     </Text>
-                  </Pressable>
+                  </View>
+                  <View style={extraStyles.cardLinks}>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={language === "es" ? `Ver historial de ${dose.name} para las ${displayReminderTime(scheduledDose.time, language)}` : `View ${dose.name} history for ${scheduledDose.time}`}
+                      onPress={() => onHistory(scheduledDose.id)}
+                    >
+                      <Text style={[extraStyles.cardLink, largeText && styles.largeCardLink, monochrome && styles.monochromeText]}>
+                        {language === "es" ? "Historial" : "History"}
+                      </Text>
+                    </Pressable>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={language === "es" ? `${state === "completed" ? "Marcar como no tomada" : "Marcar como tomada"}: ${dose.name} a las ${displayReminderTime(scheduledDose.time, language)}` : `${state === "completed" ? "Mark incomplete" : "Mark as taken"}: ${dose.name} at ${scheduledDose.time}`}
+                      accessibilityHint={language === "es" ? "Registra esta dosis en el historial de seguimiento" : "Records this dose in adherence history"}
+                      onPress={() => onToggle(scheduledDose.id)}
+                      style={[styles.doneButton, state === "completed" && styles.checkedButton, monochrome && styles.monochromeButton]}
+                    >
+                      <Text style={styles.doneText}>
+                        {state === "completed"
+                          ? language === "es"
+                            ? "✓ Tomada"
+                            : "✓ Taken"
+                          : language === "es"
+                            ? "Marcar tomada"
+                            : "Mark taken"}
+                      </Text>
+                    </Pressable>
+                  </View>
                 </View>
                 {state === "late" && (
                   <View style={extraStyles.missedDoseSafety}>
-                    <Text style={extraStyles.missedDoseSafetyText}>
+                    <Text style={[extraStyles.missedDoseSafetyText, largeText && styles.largeMissedDoseSafetyText]}>
                       {language === "es"
                         ? "Sigue la etiqueta de tu receta o las instrucciones de tu profesional. No dupliques una dosis a menos que te lo indiquen."
                         : "Follow your prescription label or clinician’s instructions. Do not double-dose unless instructed."}
                     </Text>
-                    <View style={extraStyles.missedDoseActions}>
+                    <View style={[extraStyles.missedDoseActions, largeText && extraStyles.missedDoseActionsLarge]}>
                       <Pressable
                         accessibilityRole="button"
                         accessibilityLabel={language === "es" ? "Registrar como omitida" : "Record as skipped"}
                         onPress={() => onSkip(scheduledDose.id)}
-                        style={styles.choice}
+                        style={[styles.choice, extraStyles.missedDoseAction]}
                       >
-                        <Text style={styles.choiceText}>{language === "es" ? "Omitida" : "Skipped"}</Text>
+                        <Text style={[styles.choiceText, largeText && styles.largeActionText]}>{language === "es" ? "Omitida" : "Skipped"}</Text>
                       </Pressable>
                       <Pressable
                         accessibilityRole="button"
                         accessibilityLabel={language === "es" ? "Registrar como tomada más tarde" : "Record as taken later"}
                         onPress={() => onToggle(scheduledDose.id)}
-                        style={[styles.doneButton, monochrome && styles.monochromeButton]}
+                        style={[styles.doneButton, extraStyles.missedDoseAction, monochrome && styles.monochromeButton]}
                       >
-                        <Text style={styles.doneText}>{language === "es" ? "Tomada más tarde" : "Taken later"}</Text>
+                        <Text style={[styles.doneText, largeText && styles.largeActionText]}>{language === "es" ? "Tomada más tarde" : "Taken later"}</Text>
                       </Pressable>
                     </View>
                   </View>
@@ -5806,6 +5811,8 @@ const styles = StyleSheet.create({
   largeHomeActionLabel: { fontSize: 20, lineHeight: 27 },
   largeHomeActionDetail: { fontSize: 16, lineHeight: 23 },
   largeCardLink: { fontSize: 16, lineHeight: 22 },
+  largeActionText: { fontSize: 18, lineHeight: 25 },
+  largeMissedDoseSafetyText: { fontSize: 18, lineHeight: 26 },
   largeContent: { paddingHorizontal: 24 },
   highContrastRoot: { backgroundColor: "#FFFFFF" },
   highContrastCard: {

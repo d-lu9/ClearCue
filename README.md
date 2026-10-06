@@ -12,6 +12,19 @@ The native mobile project is in [`mobile/`](mobile).
 
 Expo Go is useful for prototype work, but real reminder behavior must be validated in a standalone iPhone development or TestFlight build before release.
 
+## Build for TestFlight
+
+The iOS app identifier, Expo project link, and native permissions are recorded in [`mobile/app.json`](mobile/app.json). EAS build profiles are in [`mobile/eas.json`](mobile/eas.json). The production profile uses remote app versioning and automatically increments the build number.
+
+From `mobile/`, after signing in to the Expo and Apple accounts that own this app:
+
+```powershell
+npx eas-cli@latest build --platform ios --profile production
+npx eas-cli@latest submit --platform ios --profile production --latest
+```
+
+The first command creates a new iOS build; the second sends the latest build to App Store Connect for TestFlight processing. A GitHub commit alone does not update the TestFlight installation. Keep signing credentials in Expo/Apple account services, not in this repository.
+
 ## Current app source
 
 The current ClearCue app is the Expo project in [`mobile/`](mobile). It is the only runnable app source in this repository; the earlier root-level web prototype has been retired so it cannot be mistaken for the current product.

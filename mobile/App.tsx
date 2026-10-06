@@ -139,6 +139,7 @@ const HISTORY_KEY = "clearcue-adherence-v1";
 const TRACKING_START_KEY = "clearcue-tracking-start-v1";
 const SETTINGS_KEY = "clearcue-accessibility-settings-v1";
 const ONBOARDING_KEY = "clearcue-onboarding-v1";
+const DEMO_ONBOARDING_KEY = "clearcue-demo-onboarding-v1";
 const DEMO_MODE_KEY = "clearcue-demo-mode-v1";
 const SECURE_STORAGE_PREFIX = "clearcue.secure.";
 // Keep each Unicode chunk well below the smallest documented keychain-item limit.
@@ -1365,6 +1366,7 @@ export default function App() {
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [appLocked, setAppLocked] = useState(false);
   const [onboardingVisible, setOnboardingVisible] = useState(false);
+  const [onboardingMode, setOnboardingMode] = useState<"normal" | "demo">("normal");
   const [showOnboardingAfterPrivacy, setShowOnboardingAfterPrivacy] =
     useState(false);
   const [onboardingStep, setOnboardingStep] = useState(0);
@@ -1423,12 +1425,18 @@ export default function App() {
         if (storedTrackingStart) setTrackingStart(storedTrackingStart);
         if (!storedSettings && await AccessibilityInfo.isReduceMotionEnabled())
           setSettings((current) => ({ ...current, reduceMotion: true }));
-        if (!(await AsyncStorage.getItem(ONBOARDING_KEY)))
+        const [normalGuideComplete, demoActive, demoGuideComplete] =
+          await Promise.all([
+            AsyncStorage.getItem(ONBOARDING_KEY),
+            AsyncStorage.getItem(DEMO_MODE_KEY),
+            AsyncStorage.getItem(DEMO_ONBOARDING_KEY),
+          ]);
+        if (!demoActive && !normalGuideComplete)
           setOnboardingVisible(true);
         const scheduled =
           await Notifications.getAllScheduledNotificationsAsync();
         setRemindersEnabled(scheduled.length > 0);
-        if (await AsyncStorage.getItem(DEMO_MODE_KEY)) {
+        if (demoActive) {
           const demo = buildDemoRoutine();
           setDoses(demo.doses);
           setHistory(demo.history);
@@ -1436,6 +1444,10 @@ export default function App() {
           setDemoMode(true);
           setRemindersEnabled(false);
           await Notifications.cancelAllScheduledNotificationsAsync();
+          if (!demoGuideComplete) {
+            setOnboardingMode("demo");
+            setOnboardingVisible(true);
+          }
         }
       } catch {
         Alert.alert(
@@ -2064,6 +2076,7 @@ export default function App() {
     setDemoModeNotice(null);
     try {
       if (enabled) {
+        const firstDemoVisit = !(await AsyncStorage.getItem(DEMO_ONBOARDING_KEY));
         personalSnapshot.current = { doses, history, trackingStart };
         personalReminders.current = remindersEnabled;
         const demo = buildDemoRoutine();
@@ -2080,6 +2093,11 @@ export default function App() {
           ]);
         } catch {
           // Demo content is already active; persistence and notification cleanup can retry next launch.
+        }
+        if (firstDemoVisit) {
+          setOnboardingMode("demo");
+          setShowOnboardingAfterSettings(true);
+          setSettingsOpen(false);
         }
         return;
       }
@@ -2174,6 +2192,7 @@ export default function App() {
     setRemindersEnabled(false);
     setRemindersNeedRefresh(false);
     setShowOnboardingAfterPrivacy(true);
+    setOnboardingMode("normal");
     setPrivacyOpen(false);
     eraseInProgress.current = false;
   }
@@ -2777,6 +2796,7 @@ export default function App() {
         settings={settings}
         onChange={setSettings}
         onShowOnboarding={() => {
+          setOnboardingMode(demoMode ? "demo" : "normal");
           setShowOnboardingAfterSettings(true);
           setSettingsOpen(false);
         }}
@@ -2804,12 +2824,13 @@ export default function App() {
         visible={onboardingVisible}
         animation={settings.reduceMotion ? "none" : "slide"}
         language={settings.language}
+        mode={onboardingMode}
         step={onboardingStep}
         onNext={() => setOnboardingStep((current) => Math.min(current + 1, 2))}
         onComplete={() => {
           setOnboardingVisible(false);
           setOnboardingStep(0);
-          void AsyncStorage.setItem(ONBOARDING_KEY, "complete").catch(
+          void AsyncStorage.setItem(onboardingMode === "demo" ? DEMO_ONBOARDING_KEY : ONBOARDING_KEY, "complete").catch(
             () => undefined,
           );
         }}
@@ -4087,11 +4108,13 @@ function SettingsModal({
           </View>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={spanish ? "Ver guía de bienvenida de ClearCue" : "View ClearCue welcome guide"}
+            accessibilityLabel={demoMode
+              ? (spanish ? "Ver guía del modo demo de ClearCue" : "View ClearCue Demo Mode guide")
+              : (spanish ? "Ver guía de bienvenida de ClearCue" : "View ClearCue welcome guide")}
             onPress={onShowOnboarding}
             style={extraStyles.welcomeGuideButton}
           >
-            <Text style={extraStyles.cardLink}>{spanish ? "Ver guía de bienvenida" : "View welcome guide"}</Text>
+            <Text style={extraStyles.cardLink}>{demoMode ? (spanish ? "Ver guía del modo demo" : "View Demo Mode guide") : (spanish ? "Ver guía de bienvenida" : "View welcome guide")}</Text>
           </Pressable>
           <Pressable
             accessibilityRole="button"
@@ -4218,6 +4241,7 @@ function OnboardingModal({
   visible,
   animation,
   language,
+  mode,
   step,
   onNext,
   onComplete,
@@ -4225,13 +4249,22 @@ function OnboardingModal({
   visible: boolean;
   animation: "none" | "slide";
   language: "en" | "es";
+  mode: "normal" | "demo";
   step: number;
   onNext: () => void;
   onComplete: () => void;
 }) {
   const spanish = language === "es";
   const { largeText, monochrome } = useContext(AccessibilityPresentationContext);
-  const screens = spanish ? [
+  const screens = mode === "demo" ? (spanish ? [
+    { eyebrow: "MODO DEMO", title: "Explora ClearCue sin cambiar tu plan.", body: "Prueba gotas, el calendario y los informes con datos de ejemplo." },
+    { eyebrow: "SOLO EJEMPLOS", title: "Los recordatorios locales están desactivados.", body: "Lo que marques en la demo no se guarda en tu rutina personal. Si compartes con un cuidador, pausar las alertas remotas requiere Internet." },
+    { eyebrow: "VUELVE CUANDO QUIERAS", title: "Tu rutina te espera.", body: "Desactiva el modo demo en Ajustes para volver a tus medicamentos y registros personales." },
+  ] : [
+    { eyebrow: "DEMO MODE", title: "Explore ClearCue without changing your plan.", body: "Try sample eye drops, the calendar, and reports with example data." },
+    { eyebrow: "SAMPLES ONLY", title: "Local reminders are off.", body: "What you mark in the demo is not saved to your personal routine. If you share with a caregiver, pausing remote alerts requires internet." },
+    { eyebrow: "RETURN ANYTIME", title: "Your routine is waiting.", body: "Turn off Demo Mode in Settings to return to your personal medications and records." },
+  ]) : spanish ? [
     { eyebrow: "BIENVENIDO A CLEARCUE", title: "Rutinas más claras, una gota a la vez.", body: "Mantén recordatorios de gotas, progreso diario y un resumen simple del paciente juntos en tu teléfono." },
     { eyebrow: "TU ATENCIÓN ES LO PRIMERO", title: "ClearCue apoya el plan de tu profesional.", body: "No diagnostica, receta, cambia tu dosis ni reemplaza las instrucciones de tu profesional o la etiqueta de la receta." },
     { eyebrow: "PRIVADO POR DEFECTO", title: "Tú mantienes el control.", body: "Tu rutina se guarda en este dispositivo. Tú eliges si usar recordatorios y cuándo compartir un informe generado por el paciente." },
@@ -4285,24 +4318,28 @@ function OnboardingModal({
             accessibilityRole="button"
             accessibilityLabel={
               step === screens.length - 1
-                ? spanish ? "Comenzar con ClearCue" : "Get started with ClearCue"
+                ? mode === "demo"
+                  ? spanish ? "Explorar modo demo" : "Explore Demo Mode"
+                  : spanish ? "Comenzar con ClearCue" : "Get started with ClearCue"
                 : spanish ? "Continuar bienvenida" : "Continue onboarding"
             }
             onPress={step === screens.length - 1 ? onComplete : onNext}
             style={styles.saveButton}
           >
             <Text style={styles.saveText}>
-              {step === screens.length - 1 ? (spanish ? "Comenzar" : "Get started") : (spanish ? "Continuar" : "Continue")}
+              {step === screens.length - 1
+                ? mode === "demo" ? (spanish ? "Explorar demo" : "Explore demo") : (spanish ? "Comenzar" : "Get started")
+                : (spanish ? "Continuar" : "Continue")}
             </Text>
           </Pressable>
           {step < screens.length - 1 && (
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={spanish ? "Omitir bienvenida" : "Skip onboarding"}
+              accessibilityLabel={mode === "demo" ? (spanish ? "Omitir guía de demo" : "Skip demo guide") : (spanish ? "Omitir bienvenida" : "Skip onboarding")}
               onPress={onComplete}
               style={extraStyles.onboardingSkip}
             >
-              <Text style={[styles.history, largeText && styles.largeAccentLabel, monochrome && styles.monochromeText]}>{spanish ? "Omitir por ahora" : "Skip for now"}</Text>
+              <Text style={[styles.history, largeText && styles.largeAccentLabel, monochrome && styles.monochromeText]}>{mode === "demo" ? (spanish ? "Omitir guía" : "Skip guide") : (spanish ? "Omitir por ahora" : "Skip for now")}</Text>
             </Pressable>
           )}
         </View>

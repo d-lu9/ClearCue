@@ -1335,9 +1335,9 @@ export default function App() {
   const [remindersNeedRefresh, setRemindersNeedRefresh] = useState(false);
   const [reminderCheckup, setReminderCheckup] = useState<ReminderCheckup | null>(null);
   const [history, setHistory] = useState<DoseLog[]>([]);
-  const [showInsights, setShowInsights] = useState(false);
-  const homeScrollRef = useRef<ScrollView>(null);
-  const insightsY = useRef(0);
+  const homePagerRef = useRef<ScrollView>(null);
+  const [homePage, setHomePage] = useState(0);
+  const [homePagerWidth, setHomePagerWidth] = useState(0);
   const [trackingStart, setTrackingStart] = useState(dateKey(new Date()));
   const [reportOpen, setReportOpen] = useState(false);
   const [routineReviewOpen, setRoutineReviewOpen] = useState(false);
@@ -2149,7 +2149,18 @@ export default function App() {
     setPrivacyOpen(false);
   }
   function openInsights() {
-    setShowInsights(true);
+    setHomePage(1);
+    homePagerRef.current?.scrollTo({
+      x: homePagerWidth,
+      animated: !settings.reduceMotion,
+    });
+  }
+  function selectHomePage(page: 0 | 1) {
+    setHomePage(page);
+    homePagerRef.current?.scrollTo({
+      x: homePagerWidth * page,
+      animated: !settings.reduceMotion,
+    });
   }
   async function authenticateAppLock() {
     try {
@@ -2239,7 +2250,6 @@ export default function App() {
       >
         <StatusBar style={settings.highContrast && !settings.colorBlindMode ? "light" : "dark"} />
         <ScrollView
-          ref={homeScrollRef}
           contentContainerStyle={[
             styles.content,
             settings.largeText && styles.largeContent,
@@ -2339,125 +2349,166 @@ export default function App() {
               monochrome={settings.colorBlindMode}
             />
           </View>
-          <View style={styles.sectionHeader}>
-            <View>
-              <AccentLabel>{copy.next}</AccentLabel>
-              <Text style={[styles.sectionTitle, scaleSectionTitle]}>
-                {copy.schedule}
-              </Text>
-            </View>
-          </View>
-          <View style={styles.list}>
-            {routineGroups.length ? (
-              routineGroups.map((group) => (
-                <DoseCard
-                  key={group.id}
-                  doses={group.doses}
-                  language={settings.language}
-                  largeText={settings.largeText}
-                  monochrome={settings.colorBlindMode}
-                  history={history}
-                  onToggle={toggleDose}
-                  onSkip={(id) => recordDose(id, "skipped")}
-                  onEdit={() => editDose(group.doses[0])}
-                  onHistory={setHistoryDoseId}
-                />
-              ))
-            ) : (
-              <EmptyRoutine
-                onAdd={startAddingDose}
-                onGuide={() => setGuideOpen(true)}
-                language={settings.language}
-                largeText={settings.largeText}
-                monochrome={settings.colorBlindMode}
-              />
+          <View
+            style={styles.homePager}
+            onLayout={(event) => setHomePagerWidth(event.nativeEvent.layout.width)}
+          >
+            {homePagerWidth > 0 && (
+              <ScrollView
+                ref={homePagerRef}
+                horizontal
+                pagingEnabled
+                directionalLockEnabled
+                showsHorizontalScrollIndicator={false}
+                scrollEventThrottle={16}
+                onMomentumScrollEnd={(event) =>
+                  setHomePage(
+                    Math.round(
+                      event.nativeEvent.contentOffset.x /
+                        event.nativeEvent.layoutMeasurement.width,
+                    ) === 1
+                      ? 1
+                      : 0,
+                  )
+                }
+              >
+                <View style={[styles.homePage, { width: homePagerWidth }]}>
+                  <View style={styles.sectionHeader}>
+                    <View>
+                      <AccentLabel>{copy.next}</AccentLabel>
+                      <Text style={[styles.sectionTitle, scaleSectionTitle]}>
+                        {copy.schedule}
+                      </Text>
+                    </View>
+                  </View>
+                  <View style={styles.list}>
+                    {routineGroups.length ? (
+                      routineGroups.map((group) => (
+                        <DoseCard
+                          key={group.id}
+                          doses={group.doses}
+                          language={settings.language}
+                          largeText={settings.largeText}
+                          monochrome={settings.colorBlindMode}
+                          history={history}
+                          onToggle={toggleDose}
+                          onSkip={(id) => recordDose(id, "skipped")}
+                          onEdit={() => editDose(group.doses[0])}
+                          onHistory={setHistoryDoseId}
+                        />
+                      ))
+                    ) : (
+                      <EmptyRoutine
+                        onAdd={startAddingDose}
+                        onGuide={() => setGuideOpen(true)}
+                        language={settings.language}
+                        largeText={settings.largeText}
+                        monochrome={settings.colorBlindMode}
+                      />
+                    )}
+                  </View>
+                  <View
+                    style={[
+                      styles.reminderCard,
+                      settings.highContrast && styles.highContrastSoftCard,
+                      settings.colorBlindMode && styles.monochromeSoftCard,
+                    ]}
+                  >
+                    <View style={styles.reminderCopy}>
+                      <Text style={[styles.reminderTitle, scaleText, settings.colorBlindMode && styles.monochromeText]}>
+                        {copy.reminders}
+                      </Text>
+                      <Text style={[styles.reminderText, scaleText, settings.colorBlindMode && styles.monochromeText]}>
+                        {remindersEnabled && remindersNeedRefresh
+                          ? settings.language === "es"
+                            ? "Los cambios de la rutina están guardados. Actualiza los recordatorios cuando estés listo."
+                            : "Routine changes are saved. Refresh reminders when you are ready."
+                          : remindersEnabled
+                            ? settings.language === "es"
+                              ? "Los recordatorios de ClearCue están activos."
+                              : "ClearCue reminders are on."
+                            : settings.language === "es"
+                              ? "Activa recordatorios suaves para tu rutina."
+                              : "Turn on gentle reminders for your routine."}
+                      </Text>
+                    </View>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={
+                        remindersNeedRefresh
+                          ? settings.language === "es"
+                            ? "Actualizar los recordatorios de ClearCue"
+                            : "Refresh ClearCue reminders"
+                          : remindersEnabled
+                            ? copy.synced
+                            : copy.enable
+                      }
+                      onPress={() => void enableReminders()}
+                      style={[
+                        styles.reminderButton,
+                        remindersEnabled && styles.reminderButtonOn,
+                        settings.colorBlindMode && styles.monochromeButton,
+                      ]}
+                    >
+                      <Text style={styles.reminderButtonText}>
+                        {remindersNeedRefresh
+                          ? settings.language === "es"
+                            ? "Actualizar"
+                            : "Refresh"
+                          : remindersEnabled
+                            ? copy.synced
+                            : copy.enable}
+                      </Text>
+                    </Pressable>
+                  </View>
+                  <View
+                    style={[
+                      styles.tip,
+                      settings.highContrast && styles.highContrastSoftCard,
+                      settings.colorBlindMode && styles.monochromeSoftCard,
+                    ]}
+                  >
+                    <Text style={[styles.tipIcon, settings.colorBlindMode && styles.monochromeText]}>i</Text>
+                    <View style={styles.tipContent}>
+                      <Text style={[styles.tipTitle, scaleText, settings.colorBlindMode && styles.monochromeText]}>{copy.spacing}</Text>
+                      <Text style={[styles.tipText, scaleText, settings.colorBlindMode && styles.monochromeText]}>
+                        {copy.spacingDetail}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+                <View style={[styles.homePage, { width: homePagerWidth }]}>
+                  <AdherencePanel
+                    data={adherence}
+                    onGenerateReport={() => setReportOpen(true)}
+                    language={settings.language}
+                  />
+                </View>
+              </ScrollView>
             )}
           </View>
-          {showInsights && (
-            <View
-              onLayout={(event) => {
-                insightsY.current = event.nativeEvent.layout.y;
-                homeScrollRef.current?.scrollTo({
-                  y: Math.max(0, insightsY.current - 12),
-                  animated: true,
-                });
-              }}
-            >
-              <AdherencePanel
-                data={adherence}
-                onGenerateReport={() => setReportOpen(true)}
-                language={settings.language}
-              />
-            </View>
-          )}
-          <View
-            style={[
-              styles.reminderCard,
-              settings.highContrast && styles.highContrastSoftCard,
-              settings.colorBlindMode && styles.monochromeSoftCard,
-            ]}
-          >
-            <View style={styles.reminderCopy}>
-              <Text style={[styles.reminderTitle, scaleText, settings.colorBlindMode && styles.monochromeText]}>
-                {copy.reminders}
-              </Text>
-              <Text style={[styles.reminderText, scaleText, settings.colorBlindMode && styles.monochromeText]}>
-                {remindersEnabled && remindersNeedRefresh
-                  ? settings.language === "es"
-                    ? "Los cambios de la rutina están guardados. Actualiza los recordatorios cuando estés listo."
-                    : "Routine changes are saved. Refresh reminders when you are ready."
-                  : remindersEnabled
-                  ? settings.language === "es"
-                    ? "Los recordatorios de ClearCue están activos."
-                    : "ClearCue reminders are on."
-                  : settings.language === "es"
-                    ? "Activa recordatorios suaves para tu rutina."
-                    : "Turn on gentle reminders for your routine."}
-              </Text>
-            </View>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={
-                remindersNeedRefresh
-                  ? settings.language === "es"
-                    ? "Actualizar los recordatorios de ClearCue"
-                    : "Refresh ClearCue reminders"
-                  : remindersEnabled
-                    ? copy.synced
-                    : copy.enable
-              }
-              onPress={() => void enableReminders()}
-              style={[
-                styles.reminderButton,
-                remindersEnabled && styles.reminderButtonOn,
-                settings.colorBlindMode && styles.monochromeButton,
-              ]}
-            >
-              <Text style={styles.reminderButtonText}>
-                {remindersNeedRefresh
-                  ? settings.language === "es"
-                    ? "Actualizar"
-                    : "Refresh"
-                  : remindersEnabled
-                    ? copy.synced
-                    : copy.enable}
-              </Text>
-            </Pressable>
-          </View>
-          <View
-            style={[
-              styles.tip,
-              settings.highContrast && styles.highContrastSoftCard,
-              settings.colorBlindMode && styles.monochromeSoftCard,
-            ]}
-          >
-            <Text style={[styles.tipIcon, settings.colorBlindMode && styles.monochromeText]}>i</Text>
-            <View style={styles.tipContent}>
-              <Text style={[styles.tipTitle, scaleText, settings.colorBlindMode && styles.monochromeText]}>{copy.spacing}</Text>
-              <Text style={[styles.tipText, scaleText, settings.colorBlindMode && styles.monochromeText]}>
-                {copy.spacingDetail}
-              </Text>
-            </View>
+          <View accessibilityRole="tablist" style={styles.homePageDots}>
+            {[0, 1].map((page) => {
+              const selected = homePage === page;
+              const label = page === 0
+                ? settings.language === "es" ? "Rutina de hoy" : "Today's routine"
+                : settings.language === "es" ? "Progreso e informe" : "Insights and report";
+              return (
+                <Pressable
+                  key={page}
+                  accessibilityRole="tab"
+                  accessibilityState={{ selected }}
+                  accessibilityLabel={label}
+                  onPress={() => selectHomePage(page as 0 | 1)}
+                  style={[
+                    styles.homePageDot,
+                    selected && styles.homePageDotActive,
+                    settings.colorBlindMode && styles.monochromePageDot,
+                    selected && settings.colorBlindMode && styles.monochromePageDotActive,
+                  ]}
+                />
+              );
+            })}
           </View>
         </ScrollView>
         <Pressable
@@ -5400,6 +5451,23 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
   },
+  homePager: { width: "100%" },
+  homePage: { flexGrow: 1 },
+  homePageDots: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 18,
+    marginBottom: 4,
+  },
+  homePageDot: {
+    width: 9,
+    height: 9,
+    borderRadius: 5,
+    backgroundColor: "#D8B8AD",
+  },
+  homePageDotActive: { width: 25, backgroundColor: "#B85C4A" },
   sectionLabel: {
     fontSize: 13,
     lineHeight: 19,
@@ -5829,6 +5897,8 @@ const styles = StyleSheet.create({
   monochromePrimaryCard: { backgroundColor: "#000000", borderWidth: 2, borderColor: "#000000" },
   monochromeSoftCard: { backgroundColor: "#FFFFFF", borderWidth: 2, borderColor: "#000000" },
   monochromeButton: { backgroundColor: "#000000", borderWidth: 1, borderColor: "#000000", shadowOpacity: 0 },
+  monochromePageDot: { backgroundColor: "#A3A3A3" },
+  monochromePageDotActive: { backgroundColor: "#000000" },
   monochromeText: { color: "#000000" },
   monochromeLightText: { color: "#FFFFFF" },
   monochromeProgressCircle: { backgroundColor: "#FFFFFF" },

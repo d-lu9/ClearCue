@@ -28,7 +28,7 @@ The current ClearCue app is the Expo project in [`mobile/`](mobile). It is the o
 - Demo Mode, onboarding, app icon/splash screen, and device-only privacy controls
 - Encrypted local routine storage with one-time migration from earlier prototype storage, plus strict runtime validation before saved data is used
 - Optional device lock for the medication plan using Face ID, Touch ID, or device passcode in a standalone iPhone build
-- A focused home screen that prioritizes today’s eye-drop routine; reports, privacy, and accessibility are grouped under More care tools
+- A focused home screen that prioritizes today’s eye-drop routine; swipe between Today and Insights instead of scrolling through both, with reports, privacy, and accessibility grouped under More care tools
 
 ## Release highlights
 

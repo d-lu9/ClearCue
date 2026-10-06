@@ -35,7 +35,7 @@ The current ClearCue app is the Expo project in [`mobile/`](mobile). It is the o
 - Multiple daily reminder times for a single medication, with safe spacing warnings
 - Validated supply-estimate fields, date checks, and a required clinician-plan confirmation before routine changes are saved
 - Time picker, medication search, brand/alias support, category filters, and a reviewed offline catalog of common glaucoma, dry-eye, allergy, and clinician-directed post-operative drops
-- Self-reported dose history, weekly routine insights, refill estimates, and shareable summaries
+- Self-reported dose history, 30-day routine insights, refill estimates, and shareable 7- or 30-day summaries
 - Clinician-safe “How to use drops” guide, including urgent-symptoms guidance
 - Accessibility defaults: large text across routine text, forms, dropdowns, time/date controls, and section labels; high contrast; VoiceOver labels; reduced motion; color-safe labels; and Spanish across the core routine, Settings, and Insights. An optional black-and-white mode removes color from key surfaces while retaining written medication and dose-status labels.
 - Demo Mode, onboarding, app icon/splash screen, and device-only privacy controls
@@ -48,6 +48,7 @@ The current ClearCue app is the Expo project in [`mobile/`](mobile). It is the o
 
 ### Current release — v1.26.0
 
+- Insights now use a 30-day calendar: each day's ring fills in proportion to planned doses marked taken, shows a checkmark when all are marked, and flags skipped or unrecorded doses. Insights and reports give both regular and Large text more room without changing streaks, patterns, or summary sharing.
 - Today’s timeline marks each scheduled dose as upcoming, due now, completed, late, or skipped. A late dose shows non-directive label/clinician safety guidance and record-only actions.
 - A reminder checkup confirms notification permission, the next planned reminder, and whether scheduled reminders need attention.
 - One clear home card per medication, even when it has several daily times; each time keeps its own completion and history actions.

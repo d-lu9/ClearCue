@@ -3,6 +3,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as LocalAuthentication from "expo-local-authentication";
 import * as Notifications from "expo-notifications";
 import * as SecureStore from "expo-secure-store";
+import Svg, { Circle } from "react-native-svg";
 import { CaregiverModal } from "./CaregiverModal";
 import { CaregiverRecord, CaregiverSchedule, deletePatientConnection } from "./caregiver";
 import {
@@ -1357,7 +1358,7 @@ export default function App() {
   const [showOnboardingAfterSettings, setShowOnboardingAfterSettings] =
     useState(false);
   const [historyDoseId, setHistoryDoseId] = useState<string | null>(null);
-  const [reportDays, setReportDays] = useState<7 | 30>(7);
+  const [reportDays, setReportDays] = useState<7 | 30>(30);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [privacyOpen, setPrivacyOpen] = useState(false);
   const [caregiverOpen, setCaregiverOpen] = useState(false);
@@ -1613,7 +1614,7 @@ export default function App() {
     [complete, doses.length],
   );
   const adherence = useMemo(
-    () => buildAdherence(doses, history, trackingStart, 7, settings.language),
+    () => buildAdherence(doses, history, trackingStart, 30, settings.language),
     [doses, history, trackingStart, settings.language],
   );
   const reportData = useMemo(
@@ -3219,7 +3220,7 @@ function DoseCard({
     </View>
   );
 }
-type DaySummary = { date: string; label: string; statuses: AdherenceStatus[] };
+type DaySummary = { date: string; planned: number; statuses: AdherenceStatus[] };
 type AdherenceData = {
   days: DaySummary[];
   expected: number;
@@ -3228,6 +3229,7 @@ type AdherenceData = {
   missed: number;
   streak: number;
   byMedication: {
+    id: string;
     name: string;
     color: string;
     percent: number;
@@ -3244,6 +3246,8 @@ function buildAdherence(
   language: "en" | "es" = "en",
 ): AdherenceData {
   const now = new Date();
+  const logsByDoseDay = new Map(history.map((log) => [`${log.date}:${log.doseId}`, log]));
+  const getLog = (date: string, id: string) => logsByDoseDay.get(`${date}:${id}`);
   const days: DaySummary[] = [];
   for (let offset = dayCount - 1; offset >= 0; offset--) {
     const current = new Date(now);
@@ -3252,9 +3256,7 @@ function buildAdherence(
     const key = dateKey(current);
     const statuses: AdherenceStatus[] = [];
     doses.forEach((dose) => {
-      const log = history.find(
-        (item) => item.date === key && item.doseId === dose.id,
-      );
+      const log = getLog(key, dose.id);
       const due = scheduledDate(key, dose.time);
       if (log) statuses.push(log.status);
       else if (key >= trackingStart && due && due.getTime() <= now.getTime())
@@ -3262,7 +3264,7 @@ function buildAdherence(
     });
     days.push({
       date: key,
-      label: current.toLocaleDateString(language === "es" ? "es-419" : "en-US", { weekday: "narrow" }),
+      planned: key >= trackingStart ? doses.length : 0,
       statuses,
     });
   }
@@ -3276,6 +3278,7 @@ function buildAdherence(
   let streak = 0;
   for (const day of [...days].reverse()) {
     if (
+      day.planned > 0 &&
       day.statuses.length === doses.length &&
       day.statuses.every(
         (status) => status !== "missed" && status !== "skipped",
@@ -3284,25 +3287,32 @@ function buildAdherence(
       streak++;
     else if (day.statuses.length === doses.length) break;
   }
-  const byMedication = doses.map((dose) => {
+  const groupedDoses = new Map<string, Dose[]>();
+  doses.forEach((dose) => {
+    const groupId = dose.scheduleGroupId ?? dose.id;
+    groupedDoses.set(groupId, [...(groupedDoses.get(groupId) ?? []), dose]);
+  });
+  const byMedication = [...groupedDoses.entries()].map(([id, group]) => {
+    const dose = group[0];
     const doseStatuses: AdherenceStatus[] = [];
-    days.forEach((day) => {
-      const log = history.find(
-        (item) => item.date === day.date && item.doseId === dose.id,
-      );
-      const due = scheduledDate(day.date, dose.time);
-      if (log) doseStatuses.push(log.status);
-      else if (
-        day.date >= trackingStart &&
-        due &&
-        due.getTime() <= now.getTime()
-      )
-        doseStatuses.push("missed");
+    group.forEach((scheduledDose) => {
+      days.forEach((day) => {
+        const log = getLog(day.date, scheduledDose.id);
+        const due = scheduledDate(day.date, scheduledDose.time);
+        if (log) doseStatuses.push(log.status);
+        else if (
+          day.date >= trackingStart &&
+          due &&
+          due.getTime() <= now.getTime()
+        )
+          doseStatuses.push("missed");
+      });
     });
     const doseTaken = doseStatuses.filter(
       (status) => status === "taken" || status === "late",
     ).length;
     return {
+      id,
       name: dose.name,
       color: dose.color === NO_COLOR ? "#B7AAA0" : dose.color,
       percent: doseStatuses.length
@@ -3321,16 +3331,14 @@ function buildAdherence(
       let periodMissed = 0;
       periodDoses.forEach((dose) => {
         days.forEach((day) => {
-          const log = history.find(
-            (item) => item.date === day.date && item.doseId === dose.id,
-          );
+          const log = getLog(day.date, dose.id);
           const due = scheduledDate(day.date, dose.time);
           if (
             log ||
             (day.date >= trackingStart && due && due.getTime() <= now.getTime())
           ) {
             periodExpected++;
-            if (!log) periodMissed++;
+            if (!log || log.status === "missed" || log.status === "skipped") periodMissed++;
           }
         });
       });
@@ -3357,15 +3365,15 @@ function buildAdherence(
       : "Complete a few doses to unlock your first adherence insight."
     : !missed
       ? language === "es"
-        ? "Excelente constancia: no hay dosis omitidas en el período registrado."
-        : "Excellent consistency—no missed doses in the tracked period."
+      ? "Excelente constancia: no hay dosis omitidas ni sin registrar en el período registrado."
+        : "Excellent consistency—no skipped or unrecorded doses in the tracked period."
       : highest && otherRate > 0
         ? language === "es"
-          ? "Omites dosis de la " + periodName(highest.period) + ` ${(highest.rate / otherRate).toFixed(1)}× más que en otros horarios.`
-          : `You miss ${highest.period} doses ${(highest.rate / otherRate).toFixed(1)}× more often than other times.`
+          ? `Las dosis de la ${periodName(highest.period)} se omiten o quedan sin registrar ${(highest.rate / otherRate).toFixed(1)}× más que en otros horarios.`
+          : `${highest.period[0].toUpperCase()}${highest.period.slice(1)} doses are skipped or unrecorded ${(highest.rate / otherRate).toFixed(1)}× more often than at other times.`
         : language === "es"
-          ? `La mayoría de las dosis omitidas son por la ${periodName(highest?.period)}.`
-          : `Most missed doses are in the ${highest?.period ?? "tracked"} period.`;
+          ? `La mayoría de las dosis omitidas o sin registrar son por la ${periodName(highest?.period)}.`
+          : `Most skipped or unrecorded doses are in the ${highest?.period ?? "tracked"} period.`;
   return { days, expected, taken, late, missed, streak, byMedication, insight };
 }
 function AdherencePanel({
@@ -3378,110 +3386,143 @@ function AdherencePanel({
   language: "en" | "es";
 }) {
   const spanish = language === "es";
+  const { largeText, monochrome } = useContext(AccessibilityPresentationContext);
+  const [calendarWidth, setCalendarWidth] = useState(0);
   const overall = data.expected
     ? Math.round(((data.taken + data.late) / data.expected) * 100)
     : 0;
   const onTime = data.expected
     ? Math.round((data.taken / data.expected) * 100)
     : 0;
+  const firstDay = data.days[0]?.date;
+  const lastDay = data.days[data.days.length - 1]?.date;
+  const firstWeekday = firstDay ? new Date(`${firstDay}T12:00:00`).getDay() : 0;
+  const leadingCells = spanish ? (firstWeekday + 6) % 7 : firstWeekday;
+  const weekdays = spanish ? ["Lu", "Ma", "Mi", "Ju", "Vi", "Sá", "Do"] : ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
+  const circleSize = Math.max(28, Math.min(largeText ? 46 : 40, calendarWidth / 7 - 5 || 40));
+  const dateRange = firstDay && lastDay
+    ? `${new Date(`${firstDay}T12:00:00`).toLocaleDateString(spanish ? "es-419" : "en-US", { month: "short", day: "numeric" })} – ${new Date(`${lastDay}T12:00:00`).toLocaleDateString(spanish ? "es-419" : "en-US", { month: "short", day: "numeric" })}`
+    : "";
   return (
-    <View style={styles.insightsPanel}>
-      <AccentLabel>{spanish ? "ÚLTIMOS 7 DÍAS" : "LAST 7 DAYS"}</AccentLabel>
-      <Text style={styles.insightsTitle}>{spanish ? "Registro de rutina autoinformado" : "Self-reported routine record"}</Text>
-      <Text style={styles.settingsIntro}>{spanish ? "Se basa solo en las dosis que marcas en ClearCue. No verifica la administración ni la efectividad del tratamiento." : "Based only on doses you mark in ClearCue. It does not verify administration or treatment effectiveness."}</Text>
-      <View style={styles.metricRow}>
-        <Metric value={`${overall}%`} label={spanish ? "Registradas" : "Recorded"} />
-        <Metric value={`${onTime}%`} label={spanish ? "Marcadas a tiempo" : "Marked on time"} />
-        <Metric value={String(data.streak)} label={spanish ? "Días seguidos registrados" : "Recorded-day streak"} />
+    <View style={[styles.insightsPanel, largeText && styles.largeInsightsPanel]}>
+      <AccentLabel>{spanish ? "ÚLTIMOS 30 DÍAS" : "LAST 30 DAYS"}</AccentLabel>
+      <Text style={[styles.insightsTitle, largeText && styles.largeInsightsTitle, monochrome && styles.monochromeText]}>{spanish ? "Registro de rutina autoinformado" : "Self-reported routine record"}</Text>
+      <Text style={[styles.settingsIntro, largeText && styles.largeInsightsBody, monochrome && styles.monochromeText]}>{spanish ? "Se basa solo en las dosis que marcas en ClearCue. No verifica la administración ni la efectividad del tratamiento." : "Based only on doses you mark in ClearCue. It does not verify administration or treatment effectiveness."}</Text>
+      <View style={[styles.metricRow, largeText && styles.largeMetricRow]}>
+        <Metric value={`${overall}%`} label={spanish ? "Registradas" : "Recorded"} largeText={largeText} monochrome={monochrome} />
+        <Metric value={`${onTime}%`} label={spanish ? "Marcadas a tiempo" : "Marked on time"} largeText={largeText} monochrome={monochrome} />
+        <Metric value={String(data.streak)} label={spanish ? "Días seguidos registrados" : "Recorded-day streak"} largeText={largeText} monochrome={monochrome} />
       </View>
-      <Text style={styles.chartLabel}>{spanish ? "Registro de dosis autoinformado" : "Self-reported dose record"}</Text>
-      <View style={styles.weekRow}>
+      <Text style={[styles.chartLabel, largeText && styles.largeChartLabel, monochrome && styles.monochromeText]}>{spanish ? "Calendario de 30 días" : "30-day calendar"}</Text>
+      <Text style={[styles.calendarRange, largeText && styles.largeCalendarRange, monochrome && styles.monochromeText]}>{dateRange}</Text>
+      <View style={styles.calendarGrid} onLayout={(event) => setCalendarWidth(event.nativeEvent.layout.width)}>
+        {weekdays.map((label, index) => <Text key={`${label}-${index}`} style={[styles.calendarWeekday, largeText && styles.largeCalendarWeekday, monochrome && styles.monochromeText]}>{label}</Text>)}
+        {Array.from({ length: leadingCells }, (_, index) => <View key={`blank-${index}`} style={styles.calendarCell} />)}
         {data.days.map((day) => (
-          <View key={day.date} style={styles.dayColumn}>
-            <View style={styles.dayDots}>
-              {day.statuses.length === 0 ? (
-                <View style={styles.emptyDot} />
-              ) : (
-                day.statuses.map((status, index) => (
-                  <View
-                    key={`${status}-${index}`}
-                    style={[
-                      styles.statusDot,
-                      status === "taken"
-                        ? styles.takenDot
-                        : status === "late"
-                          ? styles.lateDot
-                          : styles.missedDot,
-                    ]}
-                  />
-                ))
-              )}
-            </View>
-            <Text style={styles.dayLabel}>{day.label}</Text>
+          <View key={day.date} style={[styles.calendarCell, largeText && styles.largeCalendarCell]}>
+            <DayProgressCircle day={day} size={circleSize} language={language} monochrome={monochrome} largeText={largeText} />
+            <Text style={[styles.calendarDate, largeText && styles.largeCalendarDate, monochrome && styles.monochromeText]}>{Number(day.date.slice(8, 10))}</Text>
           </View>
         ))}
       </View>
-      <View style={styles.legend}>
-        <Legend color="#557A66" label={spanish ? "Marcada a tiempo" : "Marked on time"} />
-        <Legend color="#B9823E" label={spanish ? "Tarde" : "Late"} />
-        <Legend color="#B85C4A" label={spanish ? "Omitida" : "Missed"} />
+      <Text style={[styles.calendarHelp, largeText && styles.largeCalendarHelp, monochrome && styles.monochromeText]}>
+        {spanish
+          ? "El círculo muestra la proporción de dosis planificadas marcadas como tomadas. ✓ indica que todas están marcadas; el punto señala dosis omitidas o no registradas."
+          : "The ring shows the share of planned doses marked taken. ✓ means all are marked; a dot flags skipped or unrecorded doses."}
+      </Text>
+      <View style={[styles.legend, largeText && styles.largeLegend]}>
+        <Legend color={monochrome ? "#171717" : "#557A66"} label={spanish ? "Marcada a tiempo" : "Marked on time"} largeText={largeText} />
+        <Legend color={monochrome ? "#6B6B6B" : "#B9823E"} label={spanish ? "Tarde" : "Late"} largeText={largeText} />
+        <Legend color={monochrome ? "#171717" : "#B85C4A"} label={spanish ? "Omitida / no registrada" : "Skipped / unrecorded"} largeText={largeText} />
       </View>
-      <View style={styles.insightBox}>
-        <Text style={styles.insightEyebrow}>{spanish ? "PATRÓN DETECTADO" : "PATTERN DETECTED"}</Text>
-        <Text style={styles.insightText}>{data.insight}</Text>
+      <View style={[styles.insightBox, largeText && styles.largeInsightBox, monochrome && styles.monochromeSoftCard]}>
+        <Text style={[styles.insightEyebrow, largeText && styles.largeInsightEyebrow, monochrome && styles.monochromeText]}>{spanish ? "PATRÓN DETECTADO" : "PATTERN DETECTED"}</Text>
+        <Text style={[styles.insightText, largeText && styles.largeInsightText, monochrome && styles.monochromeText]}>{data.insight}</Text>
       </View>
-      <Text style={styles.chartLabel}>{spanish ? "Por medicamento" : "By medication"}</Text>
+      <Text style={[styles.chartLabel, largeText && styles.largeChartLabel, monochrome && styles.monochromeText]}>{spanish ? "Por medicamento" : "By medication"}</Text>
       {data.byMedication.map((medication) => (
-        <View key={medication.name} style={styles.medicationRow}>
+        <View key={medication.id} style={styles.medicationRow}>
           <View
-            style={[styles.miniColor, { backgroundColor: medication.color }]}
+            style={[styles.miniColor, largeText && styles.largeMiniColor, { backgroundColor: monochrome ? "#171717" : medication.color }]}
           />
           <View style={styles.medicationInfo}>
-            <View style={styles.medicationLabelRow}>
-              <Text numberOfLines={1} style={styles.medicationName}>
+            <View style={[styles.medicationLabelRow, largeText && styles.largeMedicationLabelRow]}>
+              <Text style={[styles.medicationName, largeText && styles.largeMedicationName, monochrome && styles.monochromeText]}>
                 {medication.name}
               </Text>
-              <Text style={styles.medicationPercent}>
+              <Text style={[styles.medicationPercent, largeText && styles.largeMedicationPercent, monochrome && styles.monochromeText]}>
                 {medication.percent}%
               </Text>
             </View>
-            <View style={styles.barTrack}>
+            <View style={[styles.barTrack, largeText && styles.largeBarTrack]}>
               <View
                 style={[
                   styles.barFill,
                   {
                     width: `${medication.percent}%`,
-                    backgroundColor: medication.color,
+                    backgroundColor: monochrome ? "#171717" : medication.color,
                   },
                 ]}
               />
             </View>
-            <Text style={styles.medicationDetail}>
+            <Text style={[styles.medicationDetail, largeText && styles.largeMedicationDetail, monochrome && styles.monochromeText]}>
               {spanish ? `${medication.taken} de ${medication.expected} dosis marcadas` : `${medication.taken} of ${medication.expected} doses taken`}
             </Text>
           </View>
         </View>
       ))}
-      <Pressable onPress={onGenerateReport} style={styles.reportButton}>
-        <Text style={styles.reportButtonText}>{spanish ? "Crear resumen autoinformado" : "Generate self-reported summary"}</Text>
-        <Text style={styles.reportButtonArrow}>›</Text>
+      <Pressable accessibilityRole="button" accessibilityLabel={spanish ? "Crear resumen autoinformado" : "Generate self-reported summary"} onPress={onGenerateReport} style={[styles.reportButton, largeText && styles.largeReportButton]}>
+        <Text style={[styles.reportButtonText, largeText && styles.largeReportButtonText, monochrome && styles.monochromeText]}>{spanish ? "Crear resumen autoinformado" : "Generate self-reported summary"}</Text>
+        <Text style={[styles.reportButtonArrow, monochrome && styles.monochromeText]}>›</Text>
       </Pressable>
     </View>
   );
 }
-function Metric({ value, label }: { value: string; label: string }) {
+function DayProgressCircle({ day, size, language, monochrome, largeText }: {
+  day: DaySummary;
+  size: number;
+  language: "en" | "es";
+  monochrome: boolean;
+  largeText: boolean;
+}) {
+  const taken = day.statuses.filter((status) => status === "taken").length;
+  const late = day.statuses.filter((status) => status === "late").length;
+  const unrecorded = day.statuses.filter((status) => status === "missed" || status === "skipped").length;
+  const recorded = taken + late;
+  const complete = day.planned > 0 && recorded === day.planned;
+  const radius = size / 2 - 3.5;
+  const circumference = 2 * Math.PI * radius;
+  const takenArc = day.planned ? circumference * taken / day.planned : 0;
+  const lateArc = day.planned ? circumference * late / day.planned : 0;
+  const dateLabel = new Date(`${day.date}T12:00:00`).toLocaleDateString(language === "es" ? "es-419" : "en-US", { month: "long", day: "numeric" });
+  const progressLabel = day.planned === 0
+    ? language === "es" ? `${dateLabel}: sin seguimiento` : `${dateLabel}: not tracked`
+    : language === "es"
+      ? `${dateLabel}: ${recorded} de ${day.planned} dosis planificadas marcadas como tomadas${unrecorded ? `; ${unrecorded} omitidas o no registradas` : ""}${complete ? "; día completo" : ""}`
+      : `${dateLabel}: ${recorded} of ${day.planned} planned doses marked taken${unrecorded ? `; ${unrecorded} skipped or unrecorded` : ""}${complete ? "; complete day" : ""}`;
+  return <View accessible accessibilityRole="image" accessibilityLabel={progressLabel} style={{ width: size, height: size }}>
+    <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} accessible={false}>
+      <Circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke={monochrome ? "#B5B5B5" : "#E7DDD4"} strokeWidth={6} />
+      {takenArc > 0 && <Circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke={monochrome ? "#171717" : "#557A66"} strokeWidth={6} strokeDasharray={`${takenArc} ${circumference}`} transform={`rotate(-90 ${size / 2} ${size / 2})`} />}
+      {lateArc > 0 && <Circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke={monochrome ? "#6B6B6B" : "#B9823E"} strokeWidth={6} strokeDasharray={`${lateArc} ${circumference}`} strokeDashoffset={-takenArc} transform={`rotate(-90 ${size / 2} ${size / 2})`} />}
+    </Svg>
+    <Text accessible={false} numberOfLines={1} adjustsFontSizeToFit style={[styles.calendarCenter, largeText && styles.largeCalendarCenter, monochrome && styles.monochromeText, complete && { fontSize: size * 0.55, color: monochrome ? "#171717" : "#557A66" }, { width: size, height: size, lineHeight: size }]}>{complete ? "✓" : recorded ? `${Math.round(recorded / day.planned * 100)}%` : ""}</Text>
+    {unrecorded > 0 && <View style={[styles.calendarMissedMarker, monochrome && styles.monochromePageDotActive]} />}
+  </View>;
+}
+function Metric({ value, label, largeText, monochrome }: { value: string; label: string; largeText: boolean; monochrome: boolean }) {
   return (
-    <View style={styles.metric}>
-      <Text style={styles.metricValue}>{value}</Text>
-      <Text style={styles.metricLabel}>{label}</Text>
+    <View style={[styles.metric, largeText && styles.largeMetric, monochrome && styles.monochromeSoftCard]}>
+      <Text style={[styles.metricValue, largeText && styles.largeMetricValue, monochrome && styles.monochromeText]}>{value}</Text>
+      <Text style={[styles.metricLabel, largeText && styles.largeMetricLabel, monochrome && styles.monochromeText]}>{label}</Text>
     </View>
   );
 }
-function Legend({ color, label }: { color: string; label: string }) {
+function Legend({ color, label, largeText }: { color: string; label: string; largeText: boolean }) {
   return (
     <View style={styles.legendItem}>
-      <View style={[styles.legendDot, { backgroundColor: color }]} />
-      <Text style={styles.legendText}>{label}</Text>
+      <View style={[styles.legendDot, largeText && styles.largeLegendDot, { backgroundColor: color }]} />
+      <Text style={[styles.legendText, largeText && styles.largeLegendText]}>{label}</Text>
     </View>
   );
 }
@@ -3518,8 +3559,8 @@ function DoctorReportModal({
   async function shareReport() {
     await Share.share({
       message: spanish
-        ? `Resumen autoinformado de rutina de ClearCue\nPeriodo: ${range}\nDosis registradas: ${overall}%\nMarcadas a tiempo: ${onTime}%\nDosis no registradas: ${data.missed}\nDosis tardías: ${data.late}\nPatrón: ${data.insight}\n\nEste resumen refleja las dosis que la persona marcó en ClearCue. No verifica la administración, eficacia del tratamiento ni adherencia clínica.`
-        : `ClearCue self-reported routine summary\nPeriod: ${range}\nRecorded doses: ${overall}%\nMarked on time: ${onTime}%\nMissed doses: ${data.missed}\nLate doses: ${data.late}\nPattern: ${data.insight}\n\nThis summary reflects doses the user marked in ClearCue. It does not verify administration, treatment effectiveness, or clinical adherence.`,
+        ? `Resumen autoinformado de rutina de ClearCue\nPeriodo: ${range}\nDosis omitidas o sin registrar: ${data.missed}\nDosis registradas: ${overall}%\nMarcadas a tiempo: ${onTime}%\nDosis tardías: ${data.late}\nPatrón: ${data.insight}\n\nEste resumen refleja las dosis que la persona marcó en ClearCue. No verifica la administración, eficacia del tratamiento ni adherencia clínica.`
+        : `ClearCue self-reported routine summary\nPeriod: ${range}\nSkipped or unrecorded doses: ${data.missed}\nRecorded doses: ${overall}%\nMarked on time: ${onTime}%\nLate doses: ${data.late}\nPattern: ${data.insight}\n\nThis summary reflects doses the user marked in ClearCue. It does not verify administration, treatment effectiveness, or clinical adherence.`,
     });
   }
   return (
@@ -3531,9 +3572,9 @@ function DoctorReportModal({
     >
       <SafeAreaView style={styles.modalScreen}>
         <View style={styles.modalHeader}>
-          <View>
+          <View style={{ flex: 1, paddingRight: 12 }}>
             <AccentLabel>{spanish ? "RESUMEN DEL PACIENTE" : "PATIENT SUMMARY"}</AccentLabel>
-            <Text style={styles.modalTitle}>{spanish ? "Informe para compartir" : "Shareable report"}</Text>
+            <Text style={[styles.modalTitle, largeText && styles.largeReportTitle, monochrome && styles.monochromeText]}>{spanish ? "Informe para compartir" : "Shareable report"}</Text>
           </View>
           <Pressable
             accessibilityRole="button"
@@ -3544,8 +3585,8 @@ function DoctorReportModal({
             <Text style={styles.closeText}>×</Text>
           </Pressable>
         </View>
-        <ScrollView contentContainerStyle={styles.reportContent}>
-          <View style={styles.periodPicker}>
+        <ScrollView contentContainerStyle={[styles.reportContent, largeText && styles.largeReportContent]}>
+          <View style={[styles.periodPicker, largeText && styles.largePeriodPicker, monochrome && styles.monochromeSoftCard]}>
             {([7, 30] as const).map((period) => (
               <Pressable
                 accessibilityRole="button"
@@ -3554,13 +3595,16 @@ function DoctorReportModal({
                 onPress={() => onDays(period)}
                 style={[
                   styles.periodOption,
+                  largeText && styles.largePeriodOption,
                   days === period && styles.periodOptionSelected,
                 ]}
               >
                 <Text
                   style={[
                     styles.periodText,
+                    largeText && styles.largePeriodText,
                     days === period && styles.periodTextSelected,
+                    monochrome && styles.monochromeText,
                   ]}
                 >
                   {spanish ? `Últimos ${period} días` : `Last ${period} days`}
@@ -3568,32 +3612,32 @@ function DoctorReportModal({
               </Pressable>
             ))}
           </View>
-          <View style={styles.reportCard}>
+          <View style={[styles.reportCard, largeText && styles.largeReportCard]}>
             <Text style={[styles.reportBrand, largeText && styles.largeAccentLabel, monochrome && styles.monochromeText]}>{spanish ? "RESUMEN AUTOINFORMADO DE CLEARCUE" : "CLEARCUE SELF-REPORTED SUMMARY"}</Text>
-            <Text style={styles.reportRange}>{range}</Text>
-            <View style={styles.reportMetricGrid}>
-              <ReportMetric value={`${overall}%`} label={spanish ? "Dosis registradas" : "Recorded doses"} />
-              <ReportMetric value={`${onTime}%`} label={spanish ? "Marcadas a tiempo" : "Marked on time"} />
-              <ReportMetric value={String(data.missed)} label={spanish ? "Dosis no registradas" : "Missed doses"} />
-              <ReportMetric value={String(data.late)} label={spanish ? "Dosis tardías" : "Late doses"} />
+            <Text style={[styles.reportRange, largeText && styles.largeReportRange, monochrome && styles.monochromeText]}>{range}</Text>
+            <View style={[styles.reportMetricGrid, largeText && styles.largeReportMetricGrid]}>
+              <ReportMetric value={`${overall}%`} label={spanish ? "Dosis registradas" : "Recorded doses"} largeText={largeText} monochrome={monochrome} />
+              <ReportMetric value={`${onTime}%`} label={spanish ? "Marcadas a tiempo" : "Marked on time"} largeText={largeText} monochrome={monochrome} />
+              <ReportMetric value={String(data.missed)} label={spanish ? "Omitidas o sin registrar" : "Skipped or unrecorded"} largeText={largeText} monochrome={monochrome} />
+              <ReportMetric value={String(data.late)} label={spanish ? "Dosis tardías" : "Late doses"} largeText={largeText} monochrome={monochrome} />
             </View>
-            <Text style={styles.reportHeading}>{spanish ? "Actividad de medicamentos registrada" : "Recorded medication activity"}</Text>
+            <Text style={[styles.reportHeading, largeText && styles.largeReportHeading, monochrome && styles.monochromeText]}>{spanish ? "Actividad de medicamentos registrada" : "Recorded medication activity"}</Text>
             {data.byMedication.map((medication) => (
-              <View key={medication.name} style={styles.reportMedication}>
-                <Text style={styles.reportMedicationName}>
+              <View key={medication.id} style={[styles.reportMedication, largeText && styles.largeReportMedication]}>
+                <Text style={[styles.reportMedicationName, largeText && styles.largeReportMedicationName, monochrome && styles.monochromeText]}>
                   {medication.name}
                 </Text>
-                <Text style={styles.reportMedicationValue}>
+                <Text style={[styles.reportMedicationValue, largeText && styles.largeReportMedicationValue, monochrome && styles.monochromeText]}>
                   {medication.percent}% ({medication.taken}/
                   {medication.expected})
                 </Text>
               </View>
             ))}
-            <View style={styles.reportPattern}>
-              <Text style={styles.insightEyebrow}>{spanish ? "PATRÓN CON MÁS OMISIONES" : "MOST MISSED PATTERN"}</Text>
-              <Text style={styles.insightText}>{data.insight}</Text>
+            <View style={[styles.reportPattern, largeText && styles.largeReportPattern, monochrome && styles.monochromeSoftCard]}>
+              <Text style={[styles.insightEyebrow, largeText && styles.largeInsightEyebrow, monochrome && styles.monochromeText]}>{spanish ? "PATRÓN CON MÁS OMISIONES" : "MOST MISSED PATTERN"}</Text>
+              <Text style={[styles.insightText, largeText && styles.largeInsightText, monochrome && styles.monochromeText]}>{data.insight}</Text>
             </View>
-            <Text style={styles.reportDisclaimer}>
+            <Text style={[styles.reportDisclaimer, largeText && styles.largeReportDisclaimer, monochrome && styles.monochromeText]}>
               {spanish ? "Esto refleja las dosis que la persona marcó en ClearCue. No prueba la administración, eficacia del tratamiento ni adherencia clínica." : "This reflects doses the user marked in ClearCue. It does not prove administration, treatment effectiveness, or clinical adherence."}
             </Text>
           </View>
@@ -3603,7 +3647,7 @@ function DoctorReportModal({
             onPress={() => void shareReport()}
             style={styles.saveButton}
           >
-            <Text style={styles.saveText}>{spanish ? "Compartir informe de solo lectura" : "Share read-only report"}</Text>
+            <Text style={[styles.saveText, largeText && styles.largeReportShareText]}>{spanish ? "Compartir informe de solo lectura" : "Share read-only report"}</Text>
           </Pressable>
         </ScrollView>
       </SafeAreaView>
@@ -3748,11 +3792,11 @@ function DoseHistoryModal({
     </Modal>
   );
 }
-function ReportMetric({ value, label }: { value: string; label: string }) {
+function ReportMetric({ value, label, largeText, monochrome }: { value: string; label: string; largeText: boolean; monochrome: boolean }) {
   return (
-    <View style={styles.reportMetric}>
-      <Text style={styles.reportMetricValue}>{value}</Text>
-      <Text style={styles.reportMetricLabel}>{label}</Text>
+    <View style={[styles.reportMetric, largeText && styles.largeReportMetric, monochrome && styles.monochromeSoftCard]}>
+      <Text style={[styles.reportMetricValue, largeText && styles.largeReportMetricValue, monochrome && styles.monochromeText]}>{value}</Text>
+      <Text style={[styles.reportMetricLabel, largeText && styles.largeReportMetricLabel, monochrome && styles.monochromeText]}>{label}</Text>
     </View>
   );
 }
@@ -5625,88 +5669,92 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#E7DDD4",
   },
+  largeInsightsPanel: { padding: 22 },
   insightsTitle: {
-    fontSize: 21,
+    fontSize: 23,
+    lineHeight: 30,
     fontWeight: "800",
     color: "#3A302B",
     marginTop: 4,
   },
+  largeInsightsTitle: { fontSize: 29, lineHeight: 37, marginTop: 8 },
+  largeInsightsBody: { fontSize: 18, lineHeight: 27, marginTop: 8 },
   metricRow: { flexDirection: "row", gap: 8, marginTop: 16 },
+  largeMetricRow: { flexWrap: "wrap", gap: 12, marginTop: 22 },
   metric: {
     flex: 1,
     backgroundColor: "#F8EEE7",
     paddingVertical: 11,
     borderRadius: 12,
     alignItems: "center",
+    minHeight: 85,
+    justifyContent: "center",
   },
-  metricValue: { fontSize: 16, fontWeight: "800", color: "#B85C4A" },
+  largeMetric: { flex: 0, flexBasis: "46%", flexGrow: 1, minHeight: 112, paddingHorizontal: 10 },
+  metricValue: { fontSize: 20, lineHeight: 27, fontWeight: "800", color: "#B85C4A" },
+  largeMetricValue: { fontSize: 27, lineHeight: 35 },
   metricLabel: {
     alignSelf: "stretch",
     color: "#6F625B",
-    fontSize: 10,
-    lineHeight: 13,
+    fontSize: 13,
+    lineHeight: 18,
     marginTop: 3,
     textAlign: "center",
   },
+  largeMetricLabel: { fontSize: 17, lineHeight: 23, marginTop: 7 },
   chartLabel: {
-    fontSize: 13,
+    fontSize: 17,
+    lineHeight: 23,
     fontWeight: "800",
     color: "#3A302B",
     marginTop: 20,
     marginBottom: 10,
   },
-  weekRow: {
-    height: 73,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-end",
-  },
-  dayColumn: {
-    width: "12%",
-    alignItems: "center",
-    height: "100%",
-    justifyContent: "flex-end",
-  },
-  dayDots: {
-    height: 53,
-    justifyContent: "flex-end",
-    gap: 3,
-    alignItems: "center",
-  },
-  statusDot: { width: 11, height: 11, borderRadius: 6 },
-  takenDot: { backgroundColor: "#557A66" },
-  lateDot: { backgroundColor: "#B9823E" },
-  missedDot: { backgroundColor: "#B85C4A" },
-  emptyDot: {
-    width: 9,
-    height: 9,
-    borderRadius: 5,
-    backgroundColor: "#E7DDD4",
-  },
-  dayLabel: { fontSize: 11, color: "#6F625B", marginTop: 6 },
-  legend: { flexDirection: "row", gap: 12, marginTop: 13 },
-  legendItem: { flexDirection: "row", alignItems: "center", gap: 4 },
-  legendDot: { width: 8, height: 8, borderRadius: 4 },
-  legendText: { fontSize: 10, color: "#6F625B" },
+  largeChartLabel: { fontSize: 21, lineHeight: 29, marginTop: 28, marginBottom: 12 },
+  calendarRange: { fontSize: 14, lineHeight: 20, color: "#6F625B", marginBottom: 12 },
+  largeCalendarRange: { fontSize: 17, lineHeight: 24, marginBottom: 17 },
+  calendarHelp: { fontSize: 13, lineHeight: 19, color: "#6F625B", marginTop: 7 },
+  largeCalendarHelp: { fontSize: 17, lineHeight: 25, marginTop: 12 },
+  calendarGrid: { flexDirection: "row", flexWrap: "wrap", alignItems: "flex-start" },
+  calendarWeekday: { width: "14.2857%", textAlign: "center", color: "#6F625B", fontSize: 13, lineHeight: 19, fontWeight: "700", marginBottom: 10 },
+  largeCalendarWeekday: { fontSize: 16, lineHeight: 23, marginBottom: 14 },
+  calendarCell: { width: "14.2857%", alignItems: "center", minHeight: 62, paddingBottom: 8 },
+  largeCalendarCell: { minHeight: 74, paddingBottom: 11 },
+  calendarCenter: { position: "absolute", left: 0, top: 0, textAlign: "center", color: "#3A302B", fontSize: 10, fontWeight: "800" },
+  largeCalendarCenter: { fontSize: 12 },
+  calendarDate: { fontSize: 12, lineHeight: 17, color: "#6F625B", fontWeight: "700", marginTop: 3 },
+  largeCalendarDate: { fontSize: 16, lineHeight: 23, marginTop: 5 },
+  calendarMissedMarker: { position: "absolute", width: 8, height: 8, borderRadius: 4, right: -1, bottom: -1, backgroundColor: "#B85C4A", borderWidth: 1, borderColor: "#FFFFFF" },
+  legend: { flexDirection: "row", flexWrap: "wrap", gap: 12, marginTop: 17 },
+  largeLegend: { gap: 16, marginTop: 23 },
+  legendItem: { flexDirection: "row", alignItems: "center", gap: 6, flexShrink: 1 },
+  legendDot: { width: 10, height: 10, borderRadius: 5 },
+  largeLegendDot: { width: 13, height: 13, borderRadius: 7 },
+  legendText: { fontSize: 13, lineHeight: 18, color: "#6F625B", flexShrink: 1 },
+  largeLegendText: { fontSize: 17, lineHeight: 24 },
   insightBox: {
     marginTop: 18,
     padding: 13,
     borderRadius: 13,
     backgroundColor: "#F5E5D8",
   },
+  largeInsightBox: { marginTop: 24, padding: 19 },
   insightEyebrow: {
-    fontSize: 9,
+    fontSize: 13,
+    lineHeight: 19,
     fontWeight: "800",
     letterSpacing: 1,
     color: "#9B6B3D",
   },
+  largeInsightEyebrow: { fontSize: 17, lineHeight: 24 },
   insightText: {
-    fontSize: 13,
+    fontSize: 16,
     fontWeight: "700",
     color: "#704D30",
-    lineHeight: 18,
-    marginTop: 4,
+    lineHeight: 23,
+    marginTop: 6,
   },
+  largeInsightText: { fontSize: 20, lineHeight: 29, marginTop: 9 },
   medicationRow: {
     flexDirection: "row",
     gap: 9,
@@ -5714,19 +5762,24 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
   },
   miniColor: { width: 10, height: 10, borderRadius: 5, marginTop: 4 },
+  largeMiniColor: { width: 15, height: 15, borderRadius: 8, marginTop: 5 },
   medicationInfo: { flex: 1 },
   medicationLabelRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     gap: 8,
   },
+  largeMedicationLabelRow: { flexDirection: "column", gap: 3 },
   medicationName: {
-    fontSize: 12,
+    fontSize: 15,
+    lineHeight: 21,
     fontWeight: "700",
     color: "#3A302B",
     flex: 1,
   },
-  medicationPercent: { fontSize: 12, fontWeight: "800", color: "#B85C4A" },
+  largeMedicationName: { fontSize: 19, lineHeight: 27, flex: 0 },
+  medicationPercent: { fontSize: 15, lineHeight: 21, fontWeight: "800", color: "#B85C4A" },
+  largeMedicationPercent: { fontSize: 19, lineHeight: 27 },
   barTrack: {
     height: 7,
     borderRadius: 4,
@@ -5734,8 +5787,10 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     marginTop: 6,
   },
+  largeBarTrack: { height: 11, borderRadius: 6, marginTop: 10 },
   barFill: { height: "100%", borderRadius: 4 },
-  medicationDetail: { fontSize: 10, color: "#6F625B", marginTop: 4 },
+  medicationDetail: { fontSize: 13, lineHeight: 19, color: "#6F625B", marginTop: 5 },
+  largeMedicationDetail: { fontSize: 17, lineHeight: 25, marginTop: 8 },
   reportButton: {
     marginTop: 8,
     borderTopWidth: 1,
@@ -5745,7 +5800,9 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
   },
-  reportButtonText: { color: "#B85C4A", fontWeight: "800", fontSize: 14 },
+  largeReportButton: { marginTop: 14, paddingTop: 22, minHeight: 58, gap: 10 },
+  reportButtonText: { color: "#B85C4A", fontWeight: "800", fontSize: 16, lineHeight: 23, flex: 1 },
+  largeReportButtonText: { fontSize: 20, lineHeight: 28 },
   reportButtonArrow: {
     color: "#B85C4A",
     fontWeight: "800",
@@ -5884,20 +5941,24 @@ const styles = StyleSheet.create({
   },
   saveText: { color: "#fff", fontWeight: "800", fontSize: 16 },
   reportContent: { padding: 22, gap: 16 },
+  largeReportContent: { padding: 24, gap: 22 },
   periodPicker: {
     flexDirection: "row",
     backgroundColor: "#E7F0EE",
     borderRadius: 12,
     padding: 3,
   },
+  largePeriodPicker: { padding: 5 },
   periodOption: {
     flex: 1,
     paddingVertical: 10,
     borderRadius: 9,
     alignItems: "center",
   },
+  largePeriodOption: { paddingVertical: 16, paddingHorizontal: 5, minHeight: 58, justifyContent: "center" },
   periodOptionSelected: { backgroundColor: "#fff" },
-  periodText: { fontSize: 13, fontWeight: "700", color: "#6F625B" },
+  periodText: { fontSize: 15, lineHeight: 21, fontWeight: "700", color: "#6F625B", textAlign: "center" },
+  largePeriodText: { fontSize: 19, lineHeight: 27 },
   periodTextSelected: { color: "#B85C4A" },
   reportCard: {
     backgroundColor: "#fff",
@@ -5906,39 +5967,50 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#E7DDD4",
   },
+  largeReportCard: { padding: 24 },
+  largeReportTitle: { fontSize: 31, lineHeight: 39 },
   reportBrand: {
-    fontSize: 10,
+    fontSize: 13,
+    lineHeight: 19,
     fontWeight: "800",
     letterSpacing: 1.2,
     color: "#B85C4A",
   },
   reportRange: {
-    fontSize: 15,
+    fontSize: 17,
+    lineHeight: 24,
     fontWeight: "700",
     color: "#3A302B",
     marginTop: 5,
   },
+  largeReportRange: { fontSize: 21, lineHeight: 30, marginTop: 9 },
   reportMetricGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
     marginTop: 18,
     gap: 9,
   },
+  largeReportMetricGrid: { gap: 12, marginTop: 24 },
   reportMetric: {
     width: "47%",
     backgroundColor: "#F8EEE7",
     padding: 12,
     borderRadius: 12,
   },
-  reportMetricValue: { fontSize: 20, fontWeight: "800", color: "#B85C4A" },
-  reportMetricLabel: { fontSize: 11, color: "#6F625B", marginTop: 3 },
+  largeReportMetric: { width: "100%", padding: 17 },
+  reportMetricValue: { fontSize: 22, lineHeight: 30, fontWeight: "800", color: "#B85C4A" },
+  largeReportMetricValue: { fontSize: 29, lineHeight: 38 },
+  reportMetricLabel: { fontSize: 14, lineHeight: 20, color: "#6F625B", marginTop: 4 },
+  largeReportMetricLabel: { fontSize: 18, lineHeight: 26, marginTop: 7 },
   reportHeading: {
-    fontSize: 14,
+    fontSize: 17,
+    lineHeight: 24,
     fontWeight: "800",
     color: "#3A302B",
     marginTop: 21,
     marginBottom: 7,
   },
+  largeReportHeading: { fontSize: 22, lineHeight: 31, marginTop: 28, marginBottom: 12 },
   reportMedication: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -5947,25 +6019,32 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "#F2EBE4",
   },
+  largeReportMedication: { flexDirection: "column", gap: 5, paddingVertical: 13 },
   reportMedicationName: {
-    fontSize: 12,
+    fontSize: 15,
+    lineHeight: 21,
     fontWeight: "700",
     color: "#3A302B",
     flex: 1,
   },
-  reportMedicationValue: { fontSize: 12, color: "#6F625B" },
+  largeReportMedicationName: { fontSize: 20, lineHeight: 28, flex: 0 },
+  reportMedicationValue: { fontSize: 15, lineHeight: 21, color: "#6F625B" },
+  largeReportMedicationValue: { fontSize: 19, lineHeight: 27 },
   reportPattern: {
     marginTop: 18,
     padding: 13,
     borderRadius: 13,
     backgroundColor: "#F5E5D8",
   },
+  largeReportPattern: { marginTop: 24, padding: 19 },
   reportDisclaimer: {
-    fontSize: 10,
+    fontSize: 14,
     color: "#6F625B",
-    lineHeight: 15,
+    lineHeight: 21,
     marginTop: 18,
   },
+  largeReportDisclaimer: { fontSize: 18, lineHeight: 27, marginTop: 25 },
+  largeReportShareText: { fontSize: 20, lineHeight: 28, textAlign: "center" },
   largeText: { fontSize: 22, lineHeight: 30 },
   largeAccentLabel: { fontSize: 18, lineHeight: 25, letterSpacing: 0.8 },
   largeCardLabel: { fontSize: 16, lineHeight: 22, letterSpacing: 0.8 },

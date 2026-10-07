@@ -46,7 +46,7 @@ The current ClearCue app is the Expo project in [`mobile/`](mobile). It is the o
 
 ## Release highlights
 
-### Current release — v1.26.0
+### Current release — v1.27.0
 
 - Insights now use a 30-day calendar: each day's ring fills in proportion to planned doses marked taken, shows a checkmark when all are marked, and flags skipped or unrecorded doses. Insights and reports give both regular and Large text more room without changing streaks, patterns, or summary sharing.
 - Today’s timeline marks each scheduled dose as upcoming, due now, completed, late, or skipped. A late dose shows non-directive label/clinician safety guidance and record-only actions.
@@ -63,7 +63,7 @@ The current ClearCue app is the Expo project in [`mobile/`](mobile). It is the o
 - Required clinician-plan confirmation, bounded free-text fields, runtime data validation, date/number checks, supply and spacing warnings, and clear self-reported-adherence language.
 - iOS sheet transitions are sequenced to avoid overlapping screens; save, refresh, and Demo Mode actions guard against duplicate taps and background work stays non-interrupting.
 - Routine changes save immediately. When reminders are active, people choose when to refresh scheduled notifications.
-- Expo 57-compatible dependency patches and a narrowly scoped Xcode UUID override remove the critical and moderate npm audit findings. The remaining 15 high findings are transitive through Expo/Metro tooling (`braces` and `node-forge`); neither has a published patched version as of October 2026. Do not use `npm audit fix --force`, which proposes an incompatible Expo downgrade.
+- Expo 57-compatible dependency patches and a narrowly scoped Xcode UUID override remove the critical and moderate npm audit findings. The remaining 16 high findings are transitive through Expo/Metro and Expo Updates tooling (`braces` and `node-forge`); neither has a compatible published patch as of October 2026. Do not use `npm audit fix --force`, which proposes incompatible Expo downgrades.
 
 ### Product focus
 
@@ -84,6 +84,7 @@ Catalog changes are reviewed and shipped in app releases rather than downloaded 
 - Establish a recurring review process for the bundled medication catalog and continue improving the focused eye-drop routine experience.
 - Validate encrypted storage and optional device protection on a physical TestFlight build before release.
 - Deploy and test the optional [caregiver alert service](caregiver-service/README.md) on two real phones before enabling it in a build; the current TestFlight build does not contain a configured service.
+- EAS Update is configured for future compatible JavaScript and asset fixes. The next TestFlight build is required to receive updates; native configuration changes still require a new build.
 
 ## Before TestFlight or release
 

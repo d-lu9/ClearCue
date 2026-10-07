@@ -70,7 +70,7 @@ test("pairing, skipped-dose suppression, demo pause, one alert, and revocation w
   const sent = [];
   globalThis.fetch = async (_url, options) => {
     sent.push(JSON.parse(options.body));
-    return new Response(JSON.stringify({ data: { status: "ok" } }), { status: 200 });
+    return new Response(JSON.stringify({ data: [{ status: "ok" }] }), { status: 200 });
   };
   try {
     await cron(env, alertTime);

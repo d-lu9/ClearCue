@@ -8,10 +8,11 @@ The app remains local by default. Opting in sends only random dose IDs, times, a
 
 These are configuration steps, not automatic actions of the app. Check [Workers](https://developers.cloudflare.com/workers/platform/pricing/) and [D1](https://developers.cloudflare.com/d1/platform/pricing/) limits before deploying; usage beyond free limits may require a paid plan. Run from this directory after signing into a Cloudflare account:
 
-1. `npx wrangler@latest d1 create clearcue-caregiver`
-2. Copy `wrangler.example.toml` to `wrangler.toml`, then replace `REPLACE_WITH_YOUR_D1_DATABASE_ID` with the returned database ID. The real config is gitignored.
-3. `npx wrangler@latest d1 execute clearcue-caregiver --remote --file=./schema.sql`
-4. `npx wrangler@latest deploy`
+1. `npm install`
+2. Confirm the tracked `wrangler.jsonc` targets your Cloudflare account and database. The database ID is not a secret.
+3. `npx wrangler d1 execute clearcue-caregiver --remote --file=./schema.sql`
+4. `npm run check:config`
+5. `npm run deploy`
 5. Confirm `https://<your-worker>.workers.dev/health` returns `{"ready":true}`.
 
 The app must be built with the public Worker URL in `EXPO_PUBLIC_CAREGIVER_API_URL`. In `mobile/`, set it for the production EAS environment:

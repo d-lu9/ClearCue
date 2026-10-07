@@ -42,7 +42,7 @@ The current ClearCue app is the Expo project in [`mobile/`](mobile). It is the o
 - Encrypted local routine storage with one-time migration from earlier prototype storage, plus strict runtime validation before saved data is used
 - Optional device lock for the medication plan using Face ID, Touch ID, or device passcode in a standalone iPhone build
 - A focused home screen that prioritizes today’s eye-drop routine; swipe between Today and Insights instead of scrolling through both, with reports, privacy, and accessibility grouped under More care tools
-- Optional accountless caregiver pairing is implemented but inactive until its separate alert service and a new standalone build are configured; it shares minimal schedule/status data and sends generic, non-clinical push alerts
+- Optional accountless caregiver pairing is implemented but inactive until its separate alert service and a new standalone build are configured; it shares minimal schedule/status data and sends generic, non-clinical push alerts. The reviewed Cloudflare Worker configuration and database schema are included in this repository; activation still requires a `workers.dev` subdomain and two-device testing.
 
 ## Release highlights
 

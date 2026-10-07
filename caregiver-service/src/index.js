@@ -138,8 +138,10 @@ async function sendPush(token, language) {
     }),
   });
   if (!response.ok) return false;
-  const result = await response.json();
-  return result?.data?.status === "ok";
+  const result = await response.json().catch(() => null);
+  // Expo returns one ticket per pushed message in its `data` array. A ticket
+  // only confirms that Expo accepted the message, not that a device displayed it.
+  return Array.isArray(result?.data) && result.data.some((ticket) => ticket?.status === "ok");
 }
 
 async function withinLimit(env, request, action, limit) {
@@ -206,7 +208,14 @@ async function handleRequest(request, env) {
   if (!plan) return reply({ error: "Connection not found" }, 401);
   if (path === "/plan/status") return reply({ connected: Boolean(plan.caregiver_push_token), paused: Boolean(plan.paused) });
   if (path === "/plan/delete") {
-    await env.DB.prepare("DELETE FROM plans WHERE id = ?").bind(plan.id).run();
+    // Delete dependent data explicitly instead of relying on the database's
+    // foreign-key enforcement setting for a privacy-sensitive revoke action.
+    await env.DB.batch([
+      env.DB.prepare("DELETE FROM alerts WHERE plan_id = ?").bind(plan.id),
+      env.DB.prepare("DELETE FROM dose_records WHERE plan_id = ?").bind(plan.id),
+      env.DB.prepare("DELETE FROM doses WHERE plan_id = ?").bind(plan.id),
+      env.DB.prepare("DELETE FROM plans WHERE id = ?").bind(plan.id),
+    ]);
     return reply({ deleted: true });
   }
   if (path === "/plan/invite") {

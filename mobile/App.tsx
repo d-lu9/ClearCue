@@ -1362,8 +1362,11 @@ export default function App() {
   const [reportDays, setReportDays] = useState<7 | 30>(30);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [privacyOpen, setPrivacyOpen] = useState(false);
+  const [privacyPolicyOpen, setPrivacyPolicyOpen] = useState(false);
   const [caregiverOpen, setCaregiverOpen] = useState(false);
   const [showCaregiverAfterPrivacy, setShowCaregiverAfterPrivacy] = useState(false);
+  const [showPrivacyPolicyAfterPrivacy, setShowPrivacyPolicyAfterPrivacy] = useState(false);
+  const [showPrivacyAfterPolicy, setShowPrivacyAfterPolicy] = useState(false);
   const [guideOpen, setGuideOpen] = useState(false);
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [appLocked, setAppLocked] = useState(false);
@@ -2785,6 +2788,10 @@ export default function App() {
           setShowCaregiverAfterPrivacy(true);
           setPrivacyOpen(false);
         }}
+        onPrivacyPolicy={() => {
+          setShowPrivacyPolicyAfterPrivacy(true);
+          setPrivacyOpen(false);
+        }}
         onClose={() => setPrivacyOpen(false)}
         onDismiss={() => {
           if (showCaregiverAfterPrivacy) {
@@ -2795,6 +2802,27 @@ export default function App() {
             setShowOnboardingAfterPrivacy(false);
             setOnboardingStep(0);
             setOnboardingVisible(true);
+          }
+          if (showPrivacyPolicyAfterPrivacy) {
+            setShowPrivacyPolicyAfterPrivacy(false);
+            setPrivacyPolicyOpen(true);
+          }
+        }}
+      />
+      <PrivacyPolicyModal
+        visible={privacyPolicyOpen}
+        animation={settings.reduceMotion ? "none" : "slide"}
+        language={settings.language}
+        largeText={settings.largeText}
+        monochrome={settings.colorBlindMode}
+        onClose={() => {
+          setShowPrivacyAfterPolicy(true);
+          setPrivacyPolicyOpen(false);
+        }}
+        onDismiss={() => {
+          if (showPrivacyAfterPolicy) {
+            setShowPrivacyAfterPolicy(false);
+            setPrivacyOpen(true);
           }
         }}
       />
@@ -3879,6 +3907,7 @@ function PrivacyModal({
   onAppLockChange,
   onErase,
   onCaregiver,
+  onPrivacyPolicy,
   onClose,
   onDismiss,
 }: {
@@ -3891,6 +3920,7 @@ function PrivacyModal({
   onAppLockChange: (value: boolean) => void;
   onErase: () => Promise<void>;
   onCaregiver: () => void;
+  onPrivacyPolicy: () => void;
   onClose: () => void;
   onDismiss: () => void;
 }) {
@@ -4011,6 +4041,134 @@ function PrivacyModal({
                 </Text>
               </Pressable>
             )}
+          </View>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={spanish ? "Abrir política de privacidad" : "Open privacy policy"}
+            onPress={onPrivacyPolicy}
+            style={extraStyles.emptyGuide}
+          >
+            <Text style={extraStyles.cardLink}>
+              {spanish ? "Política de privacidad" : "Privacy Policy"}
+            </Text>
+          </Pressable>
+        </ScrollView>
+      </SafeAreaView>
+    </Modal>
+  );
+}
+function PrivacyPolicyModal({
+  visible,
+  animation,
+  language,
+  largeText,
+  monochrome,
+  onClose,
+  onDismiss,
+}: {
+  visible: boolean;
+  animation: "none" | "slide";
+  language: "en" | "es";
+  largeText: boolean;
+  monochrome: boolean;
+  onClose: () => void;
+  onDismiss: () => void;
+}) {
+  const spanish = language === "es";
+  const headingStyle = [styles.fieldLabel, { fontSize: largeText ? 20 : 16, lineHeight: largeText ? 27 : 22 }];
+  const bodyStyle = [styles.noteText, { fontSize: largeText ? 18 : 15, lineHeight: largeText ? 27 : 22, marginTop: 6 }];
+  const section = (title: string, body: string) => (
+    <View style={styles.note}>
+      <Text style={headingStyle}>{title}</Text>
+      <Text style={bodyStyle}>{body}</Text>
+    </View>
+  );
+  return (
+    <Modal
+      visible={visible}
+      animationType={animation}
+      presentationStyle="pageSheet"
+      onRequestClose={onClose}
+      onDismiss={onDismiss}
+    >
+      <SafeAreaView style={[styles.modalScreen, monochrome && styles.monochromeRoot]}>
+        <View style={styles.modalHeader}>
+          <View style={{ flex: 1, paddingRight: 12 }}>
+            <AccentLabel>{spanish ? "TUS DATOS" : "YOUR DATA"}</AccentLabel>
+            <Text style={[styles.modalTitle, largeText && { fontSize: 36, lineHeight: 42 }]}>
+              {spanish ? "Política de privacidad" : "Privacy Policy"}
+            </Text>
+          </View>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={spanish ? "Cerrar política de privacidad" : "Close privacy policy"}
+            style={styles.close}
+            onPress={onClose}
+          >
+            <Text style={styles.closeText}>×</Text>
+          </Pressable>
+        </View>
+        <ScrollView contentContainerStyle={styles.form}>
+          <View style={styles.note}>
+            <Text style={headingStyle}>
+              {spanish ? "Tu información permanece bajo tu control." : "Your information stays under your control."}
+            </Text>
+            <Text style={bodyStyle}>
+              {spanish
+                ? "Esta Política de privacidad explica cómo ClearCue.info (\"ClearCue\", \"nosotros\" o \"nuestro\") maneja la información cuando usas la aplicación móvil ClearCue y este sitio web."
+                : "This Privacy Policy explains how ClearCue.info (\"ClearCue,\" \"we,\" \"us,\" or \"our\") handles information when you use the ClearCue mobile application and this website."}
+            </Text>
+          </View>
+          {section(
+            spanish ? "La versión corta" : "The short version",
+            spanish
+              ? "ClearCue guarda tu rutina, detalles de medicamentos e historial de adherencia en este dispositivo. No tiene cuentas de ClearCue ni sincronización general en la nube. Si eliges las alertas opcionales para cuidadores, ClearCue comparte solo identificadores aleatorios de dosis, horarios, zona horaria y estado o fecha registrados con el servicio dedicado de alertas; nunca nombres de medicamentos, detalles de receta ni contactos clínicos."
+              : "ClearCue stores your routine, medication details, and adherence history on this device. It has no ClearCue accounts or general cloud sync. If you choose optional caregiver alerts, ClearCue shares only random dose IDs, scheduled times, a time zone, and recorded status or date with its dedicated alert service; never medication names, prescription details, or clinician contacts.",
+          )}
+          {section(
+            spanish ? "Información almacenada en tu dispositivo" : "Information stored on your device",
+            spanish
+              ? "ClearCue guarda detalles de la rutina, detalles de medicamentos, horas de recordatorio, detalles privados de receta, estimaciones de suministro e historial de adherencia autoinformado en el dispositivo donde usas la app. No recibimos esta información de rutina mediante un servicio en la nube operado por ClearCue."
+              : "ClearCue stores routine details, medication details, reminder times, private prescription details, supply estimates, and self-reported adherence history on the device where you use the app. We do not receive this routine information through a ClearCue-operated cloud service.",
+          )}
+          {section(
+            spanish ? "Notificaciones" : "Notifications",
+            spanish
+              ? "Si eliges recordatorios, ClearCue solicita permiso de notificaciones del dispositivo. Puedes ocultar detalles de medicamentos en las notificaciones para que los recordatorios de la pantalla bloqueada usen palabras generales. Puedes cambiar los permisos de notificaciones en la configuración de tu dispositivo."
+              : "If you choose reminders, ClearCue requests device notification permission. You can hide medication details in notifications so that lock-screen reminders use generalized wording. You can change notification permissions in your device settings.",
+          )}
+          {section(
+            spanish ? "Informes y uso compartido" : "Reports and sharing",
+            spanish
+              ? "Un informe compartible se crea solo cuando eliges Compartir informe de solo lectura. Revisa el destino antes de enviarlo. ClearCue no envía informes automáticamente a profesionales, farmacias, cuidadores ni a ninguna otra persona."
+              : "A shareable report is created only when you choose Share read-only report. Review the destination before sending it. ClearCue does not automatically send reports to clinicians, pharmacies, caregivers, or anyone else.",
+          )}
+          {section(
+            spanish ? "Tus opciones y eliminación" : "Your choices and deletion",
+            spanish
+              ? "Puedes borrar los datos locales de la rutina en los controles de Privacidad y datos de ClearCue. Esto elimina medicamentos, detalles privados de receta, historial de dosis y notificaciones programadas de ClearCue de ese dispositivo. No se puede deshacer. Los ajustes de accesibilidad permanecen en el dispositivo."
+              : "You can erase local routine data in ClearCue’s Privacy & Data controls. This removes medications, private prescription details, dose history, and scheduled ClearCue notifications from that device. It cannot be undone. Accessibility settings remain on the device.",
+          )}
+          {section(
+            spanish ? "Información de contacto del sitio web" : "Website contact information",
+            spanish
+              ? "Si nos contactas mediante el formulario de soporte o correo electrónico, usamos la información que proporcionas para responder a tu solicitud y mantener registros de soporte. No incluyas información médica privada en un mensaje de soporte a menos que sea necesaria para tu pregunta."
+              : "If you contact us through the support form or email, we use the information you provide to respond to your request and maintain support records. Do not include private medical information in a support message unless it is necessary for your question.",
+          )}
+          <View style={styles.note}>
+            <Text style={headingStyle}>{spanish ? "Contáctanos" : "Contact Us"}</Text>
+            <Text style={bodyStyle}>
+              {spanish ? "Para preguntas sobre privacidad, escribe a " : "For privacy questions, email "}
+              <Text
+                accessibilityRole="link"
+                accessibilityLabel={spanish ? "Enviar correo a team arroba clearcue punto info" : "Email team at clearcue dot info"}
+                onPress={() => void Linking.openURL("mailto:team@clearcue.info")}
+                style={[extraStyles.cardLink, { fontSize: largeText ? 18 : 15, lineHeight: largeText ? 27 : 22 }]}
+              >
+                team@clearcue.info
+              </Text>
+              .
+            </Text>
           </View>
         </ScrollView>
       </SafeAreaView>

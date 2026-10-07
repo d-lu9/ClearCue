@@ -56,7 +56,7 @@ The current ClearCue app is the Expo project in [`mobile/`](mobile). It is the o
 - Bottle-label color is optional; add/edit menus use slightly larger text throughout, with additional scaling for expanded time and calendar controls when Large text is on.
 - A calmer onboarding experience: the regular welcome guide appears on first launch, after an intentional erase-all-data action, or when opened from Settings. A separate Demo Mode guide appears automatically only on the first demo visit and can be reopened from Settings while in Demo Mode.
 - Spanish coverage throughout the interface: routine, medication form, calendar/time controls, reminders, reports, history, privacy, device protection, guidance, onboarding, alerts, and accessibility labels. Drug and official source names remain unchanged for accuracy.
-- Privacy & Data now includes a separate, dismissible in-app Privacy Policy with local-storage, notifications, optional caregiver-alert, sharing, deletion, and contact disclosures in English and Spanish.
+- Privacy & Data now includes separate, dismissible in-app Privacy Policy and Terms of Use sheets with local-storage, notifications, optional caregiver-alert, sharing, deletion, medical-safety, availability, and contact disclosures in English and Spanish.
 
 ### Reliability and safety
 

@@ -1363,10 +1363,13 @@ export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [privacyOpen, setPrivacyOpen] = useState(false);
   const [privacyPolicyOpen, setPrivacyPolicyOpen] = useState(false);
+  const [termsOpen, setTermsOpen] = useState(false);
   const [caregiverOpen, setCaregiverOpen] = useState(false);
   const [showCaregiverAfterPrivacy, setShowCaregiverAfterPrivacy] = useState(false);
   const [showPrivacyPolicyAfterPrivacy, setShowPrivacyPolicyAfterPrivacy] = useState(false);
+  const [showTermsAfterPrivacy, setShowTermsAfterPrivacy] = useState(false);
   const [showPrivacyAfterPolicy, setShowPrivacyAfterPolicy] = useState(false);
+  const [showPrivacyAfterTerms, setShowPrivacyAfterTerms] = useState(false);
   const [guideOpen, setGuideOpen] = useState(false);
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [appLocked, setAppLocked] = useState(false);
@@ -2792,6 +2795,10 @@ export default function App() {
           setShowPrivacyPolicyAfterPrivacy(true);
           setPrivacyOpen(false);
         }}
+        onTerms={() => {
+          setShowTermsAfterPrivacy(true);
+          setPrivacyOpen(false);
+        }}
         onClose={() => setPrivacyOpen(false)}
         onDismiss={() => {
           if (showCaregiverAfterPrivacy) {
@@ -2806,6 +2813,27 @@ export default function App() {
           if (showPrivacyPolicyAfterPrivacy) {
             setShowPrivacyPolicyAfterPrivacy(false);
             setPrivacyPolicyOpen(true);
+          }
+          if (showTermsAfterPrivacy) {
+            setShowTermsAfterPrivacy(false);
+            setTermsOpen(true);
+          }
+        }}
+      />
+      <TermsOfUseModal
+        visible={termsOpen}
+        animation={settings.reduceMotion ? "none" : "slide"}
+        language={settings.language}
+        largeText={settings.largeText}
+        monochrome={settings.colorBlindMode}
+        onClose={() => {
+          setShowPrivacyAfterTerms(true);
+          setTermsOpen(false);
+        }}
+        onDismiss={() => {
+          if (showPrivacyAfterTerms) {
+            setShowPrivacyAfterTerms(false);
+            setPrivacyOpen(true);
           }
         }}
       />
@@ -3908,6 +3936,7 @@ function PrivacyModal({
   onErase,
   onCaregiver,
   onPrivacyPolicy,
+  onTerms,
   onClose,
   onDismiss,
 }: {
@@ -3921,6 +3950,7 @@ function PrivacyModal({
   onErase: () => Promise<void>;
   onCaregiver: () => void;
   onPrivacyPolicy: () => void;
+  onTerms: () => void;
   onClose: () => void;
   onDismiss: () => void;
 }) {
@@ -4052,6 +4082,103 @@ function PrivacyModal({
               {spanish ? "Política de privacidad" : "Privacy Policy"}
             </Text>
           </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={spanish ? "Abrir términos de uso" : "Open terms of use"}
+            onPress={onTerms}
+            style={extraStyles.emptyGuide}
+          >
+            <Text style={extraStyles.cardLink}>
+              {spanish ? "Términos de uso" : "Terms of Use"}
+            </Text>
+          </Pressable>
+        </ScrollView>
+      </SafeAreaView>
+    </Modal>
+  );
+}
+function TermsOfUseModal({
+  visible,
+  animation,
+  language,
+  largeText,
+  monochrome,
+  onClose,
+  onDismiss,
+}: {
+  visible: boolean;
+  animation: "none" | "slide";
+  language: "en" | "es";
+  largeText: boolean;
+  monochrome: boolean;
+  onClose: () => void;
+  onDismiss: () => void;
+}) {
+  const spanish = language === "es";
+  const headingStyle = [styles.fieldLabel, { fontSize: largeText ? 20 : 16, lineHeight: largeText ? 27 : 22 }];
+  const bodyStyle = [styles.noteText, { fontSize: largeText ? 18 : 15, lineHeight: largeText ? 27 : 22, marginTop: 6 }];
+  const section = (title: string, body: string) => (
+    <View style={styles.note}>
+      <Text style={headingStyle}>{title}</Text>
+      <Text style={bodyStyle}>{body}</Text>
+    </View>
+  );
+  return (
+    <Modal visible={visible} animationType={animation} presentationStyle="pageSheet" onRequestClose={onClose} onDismiss={onDismiss}>
+      <SafeAreaView style={[styles.modalScreen, monochrome && styles.monochromeRoot]}>
+        <View style={styles.modalHeader}>
+          <View style={{ flex: 1, paddingRight: 12 }}>
+            <AccentLabel>{spanish ? "CLEARCUE" : "CLEARCUE"}</AccentLabel>
+            <Text style={[styles.modalTitle, largeText && { fontSize: 36, lineHeight: 42 }]}>
+              {spanish ? "Términos de uso" : "Terms of Use"}
+            </Text>
+          </View>
+          <Pressable accessibilityRole="button" accessibilityLabel={spanish ? "Cerrar términos de uso" : "Close terms of use"} style={styles.close} onPress={onClose}>
+            <Text style={styles.closeText}>×</Text>
+          </Pressable>
+        </View>
+        <ScrollView contentContainerStyle={styles.form}>
+          <View style={styles.note}>
+            <Text style={headingStyle}>{spanish ? "Uso de ClearCue" : "Using ClearCue"}</Text>
+            <Text style={bodyStyle}>
+              {spanish
+                ? "Al usar ClearCue, aceptas estos Términos de uso. Si no estás de acuerdo, no uses la app ni este sitio web."
+                : "By using ClearCue, you agree to these Terms of Use. If you do not agree, do not use the app or this website."}
+            </Text>
+          </View>
+          {section(
+            spanish ? "ClearCue no es atención médica" : "ClearCue is not medical care",
+            spanish
+              ? "ClearCue no diagnostica, receta, valida un plan de tratamiento clínico ni reemplaza las instrucciones de tu profesional o la etiqueta de la receta. Sigue siempre las instrucciones de tu profesional y la etiqueta de la receta. Para síntomas urgentes, sigue las instrucciones de emergencia de tu profesional o la orientación local de emergencia."
+              : "ClearCue does not diagnose, prescribe, validate a clinical treatment plan, or replace your clinician’s instructions or prescription label. Always follow your clinician’s instructions and prescription label. For urgent symptoms, follow your clinician’s emergency instructions or local emergency guidance.",
+          )}
+          {section(
+            spanish ? "Tus responsabilidades" : "Your responsibilities",
+            spanish
+              ? "Eres responsable de revisar la información que ingresas, usar los recordatorios de forma adecuada, proteger el acceso a tu dispositivo y decidir si compartir un informe. No uses ClearCue para tomar decisiones médicas ni para cambiar una dosis o un horario prescritos."
+              : "You are responsible for reviewing the information you enter, using reminders appropriately, protecting access to your device, and deciding whether to share a report. Do not use ClearCue to make medical decisions or change a prescribed dose or schedule.",
+          )}
+          {section(
+            spanish ? "Disponibilidad y actualizaciones" : "Availability and updates",
+            spanish
+              ? "Podemos modificar, actualizar, suspender o descontinuar ClearCue. Las notificaciones pueden verse afectadas por la configuración del dispositivo, el comportamiento del sistema operativo, la conectividad, el estado de la batería u otros factores fuera de nuestro control."
+              : "We may modify, update, suspend, or discontinue ClearCue. Notifications may be affected by device settings, operating-system behavior, connectivity, battery state, or other factors outside our control.",
+          )}
+          <View style={styles.note}>
+            <Text style={headingStyle}>{spanish ? "Contacto" : "Contact"}</Text>
+            <Text style={bodyStyle}>
+              {spanish ? "Las preguntas sobre estos Términos pueden enviarse a " : "Questions about these Terms may be sent to "}
+              <Text
+                accessibilityRole="link"
+                accessibilityLabel={spanish ? "Enviar correo a team arroba clearcue punto info" : "Email team at clearcue dot info"}
+                onPress={() => void Linking.openURL("mailto:team@clearcue.info")}
+                style={[extraStyles.cardLink, { fontSize: largeText ? 18 : 15, lineHeight: largeText ? 27 : 22 }]}
+              >
+                team@clearcue.info
+              </Text>
+              .
+            </Text>
+          </View>
         </ScrollView>
       </SafeAreaView>
     </Modal>

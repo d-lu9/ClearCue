@@ -55,6 +55,9 @@
     "owner": "congression-app-challenge-2026",
     "updates": {
       "url": "https://u.expo.dev/b098a7c8-a84b-4f12-9f41-67c63e292c78"
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
     }
   }
 }

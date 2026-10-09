@@ -41,13 +41,16 @@ The current ClearCue app is the Expo project in [`mobile/`](mobile). It is the o
 - Demo Mode, onboarding, app icon/splash screen, and device-only privacy controls
 - Encrypted local routine storage with one-time migration from earlier prototype storage, plus strict runtime validation before saved data is used
 - Optional device lock for the medication plan using Face ID, Touch ID, or device passcode in a standalone iPhone build
-- A focused home screen that prioritizes today’s eye-drop routine; swipe between Today and Insights instead of scrolling through both, with reports, privacy, and accessibility grouped under More care tools
+- A focused home screen that prioritizes today’s eye-drop routine; swipe between Today, Insights, and Settings instead of scrolling through separate screens.
 - Optional accountless caregiver pairing is implemented but inactive until its separate alert service and a new standalone build are configured; it shares minimal schedule/status data and sends generic, non-clinical push alerts. The reviewed Cloudflare Worker configuration and database schema are included in this repository; activation still requires a `workers.dev` subdomain and two-device testing.
 
 ## Release highlights
 
 ### Current release — v1.27.0
 
+- Today now puts the reminder refresh and reminder checkup controls directly above the schedule. It continuously explains when refreshing is needed after routine or notification changes.
+- Settings is a third horizontal tab, with Accessibility & language, Privacy & data, a dedicated Caregiver alerts subsection, and the eye-drop guide. Medication cards now keep their guarded group-level Remove action beside Edit.
+- Optional clinician instructions, private contacts, prescription details, notes, and supply estimates are collapsed inside the medication editor until explicitly opened, keeping ordinary routine edits short.
 - Insights now use a 30-day calendar: each day's ring fills in proportion to planned doses marked taken, shows a checkmark when all are marked, and flags skipped or unrecorded doses. Insights and reports give both regular and Large text more room without changing streaks, patterns, or summary sharing.
 - Today’s timeline marks each scheduled dose as upcoming, due now, completed, late, or skipped. A late dose shows non-directive label/clinician safety guidance and record-only actions.
 - A reminder checkup confirms notification permission, the next planned reminder, and whether scheduled reminders need attention.

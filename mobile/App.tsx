@@ -916,6 +916,8 @@ const extraStyles = StyleSheet.create({
   },
   cardLinks: { flexDirection: "row", gap: 7, alignItems: "center" },
   cardLink: { color: "#B85C4A", fontSize: 12, fontWeight: "800" },
+  removeCardLink: { color: "#B3362D" },
+  optionalInfoToggle: { borderWidth: 1, borderColor: "#D6C4B8", borderRadius: 14, padding: 14, gap: 4, backgroundColor: "#FFFDFB" },
   cardLinkDivider: { color: "#D6C4B8", fontSize: 14 },
   emptyRoutine: {
     alignItems: "center",
@@ -1296,6 +1298,7 @@ async function scheduleReminders(
 export default function App() {
   const [doses, setDoses] = useState(STARTING_DOSES);
   const [modalOpen, setModalOpen] = useState(false);
+  const [optionalInformationRequested, setOptionalInformationRequested] = useState(false);
   const [editingDoseId, setEditingDoseId] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [time, setTime] = useState("9:00 AM");
@@ -1341,9 +1344,9 @@ export default function App() {
   const [reminderCheckup, setReminderCheckup] = useState<ReminderCheckup | null>(null);
   const [history, setHistory] = useState<DoseLog[]>([]);
   const homePagerRef = useRef<ScrollView>(null);
-  const [homePage, setHomePage] = useState<0 | 1>(0);
+  const [homePage, setHomePage] = useState<0 | 1 | 2>(0);
   const [homePagerWidth, setHomePagerWidth] = useState(0);
-  const [homePageHeights, setHomePageHeights] = useState<[number, number]>([0, 0]);
+  const [homePageHeights, setHomePageHeights] = useState<[number, number, number]>([0, 0, 0]);
   const [trackingStart, setTrackingStart] = useState(dateKey(new Date()));
   const [reportOpen, setReportOpen] = useState(false);
   const [routineReviewOpen, setRoutineReviewOpen] = useState(false);
@@ -1351,11 +1354,7 @@ export default function App() {
     "review" | "editor" | null
   >(null);
   const [routineConfirmed, setRoutineConfirmed] = useState(false);
-  const [deleteConfirming, setDeleteConfirming] = useState(false);
-  const [careToolsOpen, setCareToolsOpen] = useState(false);
-  const [pendingCareSheet, setPendingCareSheet] = useState<
-    "privacy" | "settings" | null
-  >(null);
+  const [deleteConfirmingGroupId, setDeleteConfirmingGroupId] = useState<string | null>(null);
   const [showOnboardingAfterSettings, setShowOnboardingAfterSettings] =
     useState(false);
   const [historyDoseId, setHistoryDoseId] = useState<string | null>(null);
@@ -1365,7 +1364,6 @@ export default function App() {
   const [privacyPolicyOpen, setPrivacyPolicyOpen] = useState(false);
   const [termsOpen, setTermsOpen] = useState(false);
   const [caregiverOpen, setCaregiverOpen] = useState(false);
-  const [showCaregiverAfterPrivacy, setShowCaregiverAfterPrivacy] = useState(false);
   const [showPrivacyPolicyAfterPrivacy, setShowPrivacyPolicyAfterPrivacy] = useState(false);
   const [showTermsAfterPrivacy, setShowTermsAfterPrivacy] = useState(false);
   const [showPrivacyAfterPolicy, setShowPrivacyAfterPolicy] = useState(false);
@@ -1870,11 +1868,10 @@ export default function App() {
     setWarningDays("7");
     setSelectedMedication(null);
     setEditingDoseId(null);
-    setDeleteConfirming(false);
     setModalOpen(false);
     if (remindersEnabled) setRemindersNeedRefresh(true);
   }
-  function editDose(dose: Dose) {
+  function editDose(dose: Dose, openOptionalInformation = false) {
     const group = doses
       .filter(
         (item) =>
@@ -1907,8 +1904,8 @@ export default function App() {
     setOpenedOn(dose.supply?.openedOn ?? dateKey(new Date()));
     setWarningDays(String(dose.supply?.warningDays ?? 7));
     setSelectedMedication(null);
-    setDeleteConfirming(false);
     setRoutineFormNotice(null);
+    setOptionalInformationRequested(openOptionalInformation);
     setModalOpen(true);
   }
   function startAddingDose() {
@@ -1931,18 +1928,11 @@ export default function App() {
     setOpenedOn(dateKey(new Date()));
     setWarningDays("7");
     setSelectedMedication(null);
-    setDeleteConfirming(false);
     setRoutineFormNotice(null);
+    setOptionalInformationRequested(false);
     setModalOpen(true);
   }
-  function deleteEditingDose() {
-    if (!editingDoseId) return;
-    setDeleteConfirming(true);
-  }
-  function confirmDeleteEditingDose() {
-    if (!editingDoseId) return;
-    const dose = doses.find((item) => item.id === editingDoseId);
-    const groupId = dose?.scheduleGroupId ?? editingDoseId;
+  function removeDoseGroup(groupId: string) {
     const ids = doses
       .filter((item) => (item.scheduleGroupId ?? item.id) === groupId)
       .map((item) => item.id);
@@ -1950,10 +1940,7 @@ export default function App() {
     setHistory((current) =>
       current.filter((log) => !ids.includes(log.doseId)),
     );
-    setEditingDoseId(null);
-    setSelectedMedication(null);
-    setDeleteConfirming(false);
-    setModalOpen(false);
+    setDeleteConfirmingGroupId(null);
     if (remindersEnabled) setRemindersNeedRefresh(true);
   }
   async function enableReminders() {
@@ -2204,24 +2191,17 @@ export default function App() {
     setPrivacyOpen(false);
     eraseInProgress.current = false;
   }
-  function openInsights() {
-    setHomePage(1);
-    homePagerRef.current?.scrollTo({
-      x: homePagerWidth,
-      animated: !settings.reduceMotion,
-    });
-  }
-  function selectHomePage(page: 0 | 1) {
+  function selectHomePage(page: 0 | 1 | 2) {
     setHomePage(page);
     homePagerRef.current?.scrollTo({
       x: homePagerWidth * page,
       animated: !settings.reduceMotion,
     });
   }
-  function measureHomePage(page: 0 | 1, height: number) {
+  function measureHomePage(page: 0 | 1 | 2, height: number) {
     setHomePageHeights((current) => {
       if (current[page] === height) return current;
-      const next: [number, number] = [...current];
+      const next: [number, number, number] = [...current];
       next[page] = height;
       return next;
     });
@@ -2368,51 +2348,6 @@ export default function App() {
               </View>
             </View>
           </View>
-          <View style={extraStyles.reminderCheckup}>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={settings.language === "es" ? "Revisar confiabilidad de recordatorios" : "Check reminder reliability"}
-              onPress={() => void checkReminders()}
-              style={extraStyles.emptyGuide}
-            >
-              <Text style={extraStyles.cardLink}>
-                {settings.language === "es" ? "Revisar recordatorios" : "Check reminders"}
-              </Text>
-            </Pressable>
-            {reminderCheckup && (
-              <View
-                style={[
-                  extraStyles.reminderCheckupResult,
-                  reminderCheckup.tone === "attention" && extraStyles.reminderCheckupAttention,
-                  settings.colorBlindMode && extraStyles.monochromeCheckup,
-                ]}
-              >
-                <Text style={[extraStyles.reminderCheckupText, settings.colorBlindMode && extraStyles.monochromeText]}>{reminderCheckup.message}</Text>
-                {reminderCheckup.next && (
-                  <Text style={[extraStyles.reminderCheckupNext, settings.colorBlindMode && extraStyles.monochromeText]}>
-                    {settings.language === "es" ? "Próximo: " : "Next: "}
-                    {reminderCheckup.next}
-                  </Text>
-                )}
-              </View>
-            )}
-          </View>
-          <View style={extraStyles.quickTools}>
-            <HomeAction
-              label={
-                settings.language === "es"
-                  ? "Más herramientas"
-                  : "More care tools"
-              }
-              detail={
-                settings.language === "es"
-                  ? "Informes, privacidad y accesibilidad."
-                  : "Reports, privacy, and accessibility."
-              }
-              onPress={() => setCareToolsOpen(true)}
-              monochrome={settings.colorBlindMode}
-            />
-          </View>
           <View
             style={styles.homePager}
             onLayout={(event) => setHomePagerWidth(event.nativeEvent.layout.width)}
@@ -2429,12 +2364,10 @@ export default function App() {
                 scrollEventThrottle={16}
                 onMomentumScrollEnd={(event) =>
                   setHomePage(
-                    Math.round(
+                    Math.max(0, Math.min(2, Math.round(
                       event.nativeEvent.contentOffset.x /
                         event.nativeEvent.layoutMeasurement.width,
-                    ) === 1
-                      ? 1
-                      : 0,
+                    ))) as 0 | 1 | 2,
                   )
                 }
               >
@@ -2442,6 +2375,33 @@ export default function App() {
                   style={[styles.homePage, { width: homePagerWidth }]}
                   onLayout={(event) => measureHomePage(0, event.nativeEvent.layout.height)}
                 >
+                  <View
+                    style={[
+                      styles.reminderCard,
+                      settings.highContrast && styles.highContrastSoftCard,
+                      settings.colorBlindMode && styles.monochromeSoftCard,
+                    ]}
+                  >
+                    <View style={styles.reminderCopy}>
+                      <Text style={[styles.reminderTitle, scaleText, settings.colorBlindMode && styles.monochromeText]}>{copy.reminders}</Text>
+                      <Text style={[styles.reminderText, scaleText, settings.colorBlindMode && styles.monochromeText]}>
+                        {remindersEnabled && remindersNeedRefresh
+                          ? settings.language === "es" ? "Los cambios de la rutina están guardados. Actualiza los recordatorios ahora para que las alertas coincidan." : "Routine changes are saved. Refresh reminders now so alerts match your routine."
+                          : remindersEnabled
+                            ? settings.language === "es" ? "Los recordatorios de ClearCue están activos. Actualízalos después de cambiar medicamentos, horarios o detalles de las notificaciones." : "ClearCue reminders are on. Refresh them after changing medications, times, or notification details."
+                            : settings.language === "es" ? "Activa y actualiza recordatorios suaves para tu rutina." : "Turn on and refresh gentle reminders for your routine."}
+                      </Text>
+                    </View>
+                    <Pressable accessibilityRole="button" onPress={() => void enableReminders()} style={[styles.reminderButton, remindersEnabled && styles.reminderButtonOn, settings.colorBlindMode && styles.monochromeButton]}>
+                      <Text style={styles.reminderButtonText}>{remindersEnabled ? (settings.language === "es" ? "Actualizar" : "Refresh") : copy.enable}</Text>
+                    </Pressable>
+                  </View>
+                  <View style={extraStyles.reminderCheckup}>
+                    <Pressable accessibilityRole="button" accessibilityLabel={settings.language === "es" ? "Revisar confiabilidad de recordatorios" : "Check reminder reliability"} onPress={() => void checkReminders()} style={extraStyles.emptyGuide}>
+                      <Text style={extraStyles.cardLink}>{settings.language === "es" ? "Revisar recordatorios" : "Check reminders"}</Text>
+                    </Pressable>
+                    {reminderCheckup && <View style={[extraStyles.reminderCheckupResult, reminderCheckup.tone === "attention" && extraStyles.reminderCheckupAttention, settings.colorBlindMode && extraStyles.monochromeCheckup]}><Text style={[extraStyles.reminderCheckupText, settings.colorBlindMode && extraStyles.monochromeText]}>{reminderCheckup.message}</Text>{reminderCheckup.next && <Text style={[extraStyles.reminderCheckupNext, settings.colorBlindMode && extraStyles.monochromeText]}>{settings.language === "es" ? "Próximo: " : "Next: "}{reminderCheckup.next}</Text>}</View>}
+                  </View>
                   <View style={styles.sectionHeader}>
                     <View>
                       <AccentLabel>{copy.next}</AccentLabel>
@@ -2463,6 +2423,11 @@ export default function App() {
                           onToggle={toggleDose}
                           onSkip={(id) => recordDose(id, "skipped")}
                           onEdit={() => editDose(group.doses[0])}
+                          onOptionalInfo={() => editDose(group.doses[0], true)}
+                          onRemove={() => setDeleteConfirmingGroupId(group.id)}
+                          removing={deleteConfirmingGroupId === group.id}
+                          onCancelRemove={() => setDeleteConfirmingGroupId(null)}
+                          onConfirmRemove={() => removeDoseGroup(group.id)}
                           onHistory={setHistoryDoseId}
                         />
                       ))
@@ -2475,60 +2440,6 @@ export default function App() {
                         monochrome={settings.colorBlindMode}
                       />
                     )}
-                  </View>
-                  <View
-                    style={[
-                      styles.reminderCard,
-                      settings.highContrast && styles.highContrastSoftCard,
-                      settings.colorBlindMode && styles.monochromeSoftCard,
-                    ]}
-                  >
-                    <View style={styles.reminderCopy}>
-                      <Text style={[styles.reminderTitle, scaleText, settings.colorBlindMode && styles.monochromeText]}>
-                        {copy.reminders}
-                      </Text>
-                      <Text style={[styles.reminderText, scaleText, settings.colorBlindMode && styles.monochromeText]}>
-                        {remindersEnabled && remindersNeedRefresh
-                          ? settings.language === "es"
-                            ? "Los cambios de la rutina están guardados. Actualiza los recordatorios cuando estés listo."
-                            : "Routine changes are saved. Refresh reminders when you are ready."
-                          : remindersEnabled
-                            ? settings.language === "es"
-                              ? "Los recordatorios de ClearCue están activos."
-                              : "ClearCue reminders are on."
-                            : settings.language === "es"
-                              ? "Activa recordatorios suaves para tu rutina."
-                              : "Turn on gentle reminders for your routine."}
-                      </Text>
-                    </View>
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityLabel={
-                        remindersNeedRefresh
-                          ? settings.language === "es"
-                            ? "Actualizar los recordatorios de ClearCue"
-                            : "Refresh ClearCue reminders"
-                          : remindersEnabled
-                            ? copy.synced
-                            : copy.enable
-                      }
-                      onPress={() => void enableReminders()}
-                      style={[
-                        styles.reminderButton,
-                        remindersEnabled && styles.reminderButtonOn,
-                        settings.colorBlindMode && styles.monochromeButton,
-                      ]}
-                    >
-                      <Text style={styles.reminderButtonText}>
-                        {remindersNeedRefresh
-                          ? settings.language === "es"
-                            ? "Actualizar"
-                            : "Refresh"
-                          : remindersEnabled
-                            ? copy.synced
-                            : copy.enable}
-                      </Text>
-                    </Pressable>
                   </View>
                   <View
                     style={[
@@ -2556,22 +2467,38 @@ export default function App() {
                     language={settings.language}
                   />
                 </View>
+                <View
+                  style={[styles.homePage, { width: homePagerWidth }]}
+                  onLayout={(event) => measureHomePage(2, event.nativeEvent.layout.height)}
+                >
+                  <SettingsHub
+                    language={settings.language}
+                    largeText={settings.largeText}
+                    monochrome={settings.colorBlindMode}
+                    onAccessibility={() => setSettingsOpen(true)}
+                    onPrivacy={() => setPrivacyOpen(true)}
+                    onCaregiver={() => setCaregiverOpen(true)}
+                    onGuide={() => setGuideOpen(true)}
+                  />
+                </View>
               </ScrollView>
             )}
           </View>
           <View accessibilityRole="tablist" style={styles.homePageDots}>
-            {[0, 1].map((page) => {
+            {[0, 1, 2].map((page) => {
               const selected = homePage === page;
               const label = page === 0
                 ? settings.language === "es" ? "Rutina de hoy" : "Today's routine"
-                : settings.language === "es" ? "Progreso e informe" : "Insights and report";
+                : page === 1
+                  ? settings.language === "es" ? "Progreso e informe" : "Insights and report"
+                  : settings.language === "es" ? "Ajustes" : "Settings";
               return (
                 <Pressable
                   key={page}
                   accessibilityRole="tab"
                   accessibilityState={{ selected }}
                   accessibilityLabel={label}
-                  onPress={() => selectHomePage(page as 0 | 1)}
+                  onPress={() => selectHomePage(page as 0 | 1 | 2)}
                   style={[
                     styles.homePageDot,
                     selected && styles.homePageDotActive,
@@ -2597,6 +2524,7 @@ export default function App() {
           visible={modalOpen}
           animation={settings.reduceMotion ? "none" : "slide"}
           isEditing={Boolean(editingDoseId)}
+          optionalInformationRequested={optionalInformationRequested}
           name={name}
           time={time}
           additionalTimes={additionalTimes}
@@ -2616,7 +2544,6 @@ export default function App() {
           warningDays={warningDays}
           language={settings.language}
           largeText={settings.largeText}
-          deleteConfirming={deleteConfirming}
           formNotice={routineFormNotice}
           selectedMedication={selectedMedication}
           onName={(value) => {
@@ -2675,9 +2602,6 @@ export default function App() {
             }
           }}
           onSave={saveDose}
-          onDelete={deleteEditingDose}
-          onCancelDelete={() => setDeleteConfirming(false)}
-          onConfirmDelete={confirmDeleteEditingDose}
         />
       </SafeAreaView>
       <RoutineReviewModal
@@ -2712,30 +2636,6 @@ export default function App() {
           setPendingRoutineSheet(null);
           setRoutineReviewOpen(false);
           persistDose();
-        }}
-      />
-      <CareToolsModal
-        visible={careToolsOpen}
-        animation={settings.reduceMotion ? "none" : "slide"}
-        language={settings.language}
-        monochrome={settings.colorBlindMode}
-        onInsights={() => {
-          setCareToolsOpen(false);
-          openInsights();
-        }}
-        onPrivacy={() => {
-          setPendingCareSheet("privacy");
-          setCareToolsOpen(false);
-        }}
-        onSettings={() => {
-          setPendingCareSheet("settings");
-          setCareToolsOpen(false);
-        }}
-        onClose={() => setCareToolsOpen(false)}
-        onDismiss={() => {
-          if (pendingCareSheet === "privacy") setPrivacyOpen(true);
-          if (pendingCareSheet === "settings") setSettingsOpen(true);
-          setPendingCareSheet(null);
         }}
       />
       {launching && (
@@ -2787,10 +2687,6 @@ export default function App() {
         appLockEnabled={settings.appLockEnabled}
         onAppLockChange={(value) => void changeAppLock(value)}
         onErase={eraseRoutineData}
-        onCaregiver={() => {
-          setShowCaregiverAfterPrivacy(true);
-          setPrivacyOpen(false);
-        }}
         onPrivacyPolicy={() => {
           setShowPrivacyPolicyAfterPrivacy(true);
           setPrivacyOpen(false);
@@ -2801,10 +2697,6 @@ export default function App() {
         }}
         onClose={() => setPrivacyOpen(false)}
         onDismiss={() => {
-          if (showCaregiverAfterPrivacy) {
-            setShowCaregiverAfterPrivacy(false);
-            setCaregiverOpen(true);
-          }
           if (showOnboardingAfterPrivacy) {
             setShowOnboardingAfterPrivacy(false);
             setOnboardingStep(0);
@@ -2971,105 +2863,6 @@ function EmptyRoutine({
     </View>
   );
 }
-function CareToolsModal({
-  visible,
-  animation,
-  language,
-  monochrome,
-  onInsights,
-  onPrivacy,
-  onSettings,
-  onClose,
-  onDismiss,
-}: {
-  visible: boolean;
-  animation: "none" | "slide";
-  language: "en" | "es";
-  monochrome: boolean;
-  onInsights: () => void;
-  onPrivacy: () => void;
-  onSettings: () => void;
-  onClose: () => void;
-  onDismiss: () => void;
-}) {
-  const spanish = language === "es";
-  return (
-    <Modal
-      visible={visible}
-      animationType={animation}
-      presentationStyle="pageSheet"
-      onRequestClose={onClose}
-      onDismiss={onDismiss}
-    >
-      <SafeAreaView style={[styles.modalScreen, monochrome && styles.monochromeRoot]}>
-        <View style={styles.modalHeader}>
-          <View>
-            <AccentLabel>
-              {spanish ? "HERRAMIENTAS ADICIONALES" : "ADDITIONAL TOOLS"}
-            </AccentLabel>
-            <Text style={styles.modalTitle}>
-              {spanish ? "Atención y ajustes" : "Care & settings"}
-            </Text>
-          </View>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={
-              spanish ? "Cerrar herramientas adicionales" : "Close care tools"
-            }
-            style={styles.close}
-            onPress={onClose}
-          >
-            <Text style={styles.closeText}>×</Text>
-          </Pressable>
-        </View>
-        <ScrollView contentContainerStyle={styles.form}>
-          <View style={[styles.note, monochrome && styles.monochromeSoftCard]}>
-            <Text style={[styles.noteTitle, monochrome && styles.monochromeText]}>
-              {spanish ? "Tu rutina es lo primero" : "Your routine comes first"}
-            </Text>
-            <Text style={[styles.noteText, monochrome && styles.monochromeText]}>
-              {spanish
-                ? "Estas herramientas te ayudan a revisar tu progreso y ajustar ClearCue sin distraerte de las gotas de hoy."
-                : "These supporting tools help you review progress and adjust ClearCue without taking focus from today’s eye drops."}
-            </Text>
-          </View>
-          <View style={extraStyles.quickTools}>
-            <HomeAction
-              label={spanish ? "Progreso e informe" : "Insights & report"}
-              detail={
-                spanish
-                  ? "Revisa tu adherencia y comparte un informe."
-                  : "Review adherence and share a read-only report."
-              }
-              onPress={onInsights}
-              monochrome={monochrome}
-            />
-            <HomeAction
-              label={spanish ? "Privacidad y datos" : "Privacy & data"}
-              detail={
-                spanish
-                  ? "Controla tus datos locales y notificaciones."
-                  : "Control local data and notifications."
-              }
-              onPress={onPrivacy}
-              monochrome={monochrome}
-            />
-            <HomeAction
-              label={spanish ? "Accesibilidad" : "Accessibility"}
-              detail={
-                spanish
-                  ? "Ajusta texto, contraste, idioma y demostración."
-                  : "Adjust text, contrast, language, and demo mode."
-              }
-              onPress={onSettings}
-              monochrome={monochrome}
-            />
-          </View>
-        </ScrollView>
-      </SafeAreaView>
-    </Modal>
-  );
-}
 function HomeAction({
   label,
   detail,
@@ -3098,6 +2891,32 @@ function HomeAction({
     </Pressable>
   );
 }
+function SettingsHub({ language, largeText, monochrome, onAccessibility, onPrivacy, onCaregiver, onGuide }: {
+  language: "en" | "es";
+  largeText: boolean;
+  monochrome: boolean;
+  onAccessibility: () => void;
+  onPrivacy: () => void;
+  onCaregiver: () => void;
+  onGuide: () => void;
+}) {
+  const spanish = language === "es";
+  return <View style={styles.settingsHub}>
+    <AccentLabel>{spanish ? "PREFERENCIAS" : "PREFERENCES"}</AccentLabel>
+    <Text style={[styles.sectionTitle, largeText && styles.largeText, monochrome && styles.monochromeText]}>{spanish ? "Ajustes" : "Settings"}</Text>
+    <Text style={[styles.settingsIntro, largeText && styles.largeInsightsBody, monochrome && styles.monochromeText]}>{spanish ? "Personaliza ClearCue y controla la privacidad de este dispositivo." : "Personalize ClearCue and control privacy on this device."}</Text>
+    <View style={extraStyles.quickTools}>
+      <HomeAction label={spanish ? "Accesibilidad e idioma" : "Accessibility & language"} detail={spanish ? "Texto, contraste, movimiento, idioma y modo demo." : "Text, contrast, motion, language, and Demo Mode."} onPress={onAccessibility} monochrome={monochrome} />
+      <HomeAction label={spanish ? "Privacidad y datos" : "Privacy & data"} detail={spanish ? "Bloqueo, notificaciones, informes y datos locales." : "App lock, notifications, reports, and local data."} onPress={onPrivacy} monochrome={monochrome} />
+    </View>
+    <AccentLabel>{spanish ? "CUIDADOR" : "CAREGIVER"}</AccentLabel>
+    <Text style={[styles.settingsIntro, largeText && styles.largeInsightsBody, monochrome && styles.monochromeText]}>{spanish ? "Alertas opcionales para un cuidador, sin una cuenta de ClearCue." : "Optional caregiver alerts without a ClearCue account."}</Text>
+    <View style={extraStyles.quickTools}>
+      <HomeAction label={spanish ? "Alertas para cuidador" : "Caregiver alerts"} detail={spanish ? "Conecta o administra alertas solo si decides compartirlas." : "Connect or manage alerts only if you choose to share them."} onPress={onCaregiver} monochrome={monochrome} />
+      <HomeAction label={spanish ? "Guía de gotas" : "Eye-drop guide"} detail={spanish ? "Pasos seguros que no sustituyen a tu profesional." : "Safe steps that do not replace your clinician."} onPress={onGuide} monochrome={monochrome} />
+    </View>
+  </View>;
+}
 function DoseCard({
   doses,
   language,
@@ -3107,6 +2926,11 @@ function DoseCard({
   onToggle,
   onSkip,
   onEdit,
+  onOptionalInfo,
+  onRemove,
+  removing,
+  onCancelRemove,
+  onConfirmRemove,
   onHistory,
 }: {
   doses: Dose[];
@@ -3117,6 +2941,11 @@ function DoseCard({
   onToggle: (id: string) => void;
   onSkip: (id: string) => void;
   onEdit: () => void;
+  onOptionalInfo: () => void;
+  onRemove: () => void;
+  removing: boolean;
+  onCancelRemove: () => void;
+  onConfirmRemove: () => void;
   onHistory: (id: string) => void;
 }) {
   const dose = doses[0];
@@ -3284,11 +3113,29 @@ function DoseCard({
             >
               <Text style={[extraStyles.cardLink, largeText && styles.largeCardLink, monochrome && extraStyles.monochromeText]}>{language === "es" ? "Editar" : "Edit"}</Text>
             </Pressable>
+            <Pressable accessibilityRole="button" accessibilityLabel={language === "es" ? `Editar información opcional de ${dose.name}` : `Edit optional information for ${dose.name}`} onPress={onOptionalInfo}>
+              <Text style={[extraStyles.cardLink, largeText && styles.largeCardLink, monochrome && extraStyles.monochromeText]}>{language === "es" ? "Info. opcional" : "Optional info"}</Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={language === "es" ? `Eliminar ${dose.name}` : `Remove ${dose.name}`}
+              onPress={onRemove}
+            >
+              <Text style={[extraStyles.cardLink, extraStyles.removeCardLink, largeText && styles.largeCardLink]}>{language === "es" ? "Eliminar" : "Remove"}</Text>
+            </Pressable>
           </View>
           <Text style={[extraStyles.supplyHelp, monochrome && extraStyles.monochromeMutedText]}>
             {language === "es" ? "Cada hora se registra por separado." : "Each time is tracked separately."}
           </Text>
         </View>
+        {removing && <View style={extraStyles.deleteConfirm}>
+          <Text style={extraStyles.eraseTitle}>{language === "es" ? "¿Eliminar estas gotas?" : "Remove this eye drop?"}</Text>
+          <Text style={extraStyles.eraseText}>{language === "es" ? "Esto elimina de la rutina todos los horarios diarios de este medicamento y su historial registrado." : "This removes every daily reminder time for this medication and its recorded history from this device."}</Text>
+          <View style={styles.choiceRow}>
+            <Pressable accessibilityRole="button" onPress={onCancelRemove} style={styles.choice}><Text style={styles.choiceText}>{language === "es" ? "Conservar" : "Keep"}</Text></Pressable>
+            <Pressable accessibilityRole="button" onPress={onConfirmRemove} style={extraStyles.deleteConfirmButton}><Text style={extraStyles.deleteConfirmButtonText}>{language === "es" ? "Eliminar" : "Remove"}</Text></Pressable>
+          </View>
+        </View>}
       </View>
     </View>
   );
@@ -3934,7 +3781,6 @@ function PrivacyModal({
   appLockEnabled,
   onAppLockChange,
   onErase,
-  onCaregiver,
   onPrivacyPolicy,
   onTerms,
   onClose,
@@ -3948,7 +3794,6 @@ function PrivacyModal({
   appLockEnabled: boolean;
   onAppLockChange: (value: boolean) => void;
   onErase: () => Promise<void>;
-  onCaregiver: () => void;
   onPrivacyPolicy: () => void;
   onTerms: () => void;
   onClose: () => void;
@@ -3986,13 +3831,6 @@ function PrivacyModal({
             <Text style={styles.noteText}>
               {spanish ? "ClearCue guarda tu rutina, detalles de medicamentos e historial en este dispositivo. Las alertas opcionales para cuidadores comparten solo horarios e información de registro, nunca nombres de medicamentos ni recetas." : "ClearCue stores your routine, medication details, and history on this device. Optional caregiver alerts share only dose times and recorded status, never medication names or prescription details."}
             </Text>
-          </View>
-          <View style={styles.note}>
-            <Text style={styles.noteTitle}>{spanish ? "Alertas opcionales para cuidadores" : "Optional caregiver alerts"}</Text>
-            <Text style={styles.noteText}>{spanish ? "Conecta dos dispositivos sin cuentas y controla o revoca el acceso cuando quieras." : "Connect two devices without accounts, and check or revoke access whenever you want."}</Text>
-            <Pressable accessibilityRole="button" accessibilityLabel={spanish ? "Abrir alertas para cuidadores" : "Open caregiver alerts"} onPress={onCaregiver} style={extraStyles.welcomeGuideButton}>
-              <Text style={extraStyles.cardLink}>{spanish ? "Abrir alertas para cuidadores" : "Open caregiver alerts"}</Text>
-            </Pressable>
           </View>
           <SettingRow
             title={spanish ? "Ocultar detalles de medicamentos en notificaciones" : "Hide medication details in notifications"}
@@ -4724,6 +4562,7 @@ type ModalProps = {
   visible: boolean;
   animation: "none" | "slide";
   isEditing: boolean;
+  optionalInformationRequested: boolean;
   name: string;
   time: string;
   additionalTimes: string[];
@@ -4743,7 +4582,6 @@ type ModalProps = {
   warningDays: string;
   language: "en" | "es";
   largeText: boolean;
-  deleteConfirming: boolean;
   formNotice: { title: string; message: string; allowReview?: boolean } | null;
   selectedMedication: CatalogMedication | null;
   onName: (v: string) => void;
@@ -4769,9 +4607,6 @@ type ModalProps = {
   onReviewNotice: () => void;
   onDismiss: () => void;
   onSave: () => void;
-  onDelete: () => void;
-  onCancelDelete: () => void;
-  onConfirmDelete: () => void;
 };
 function RoutineReviewModal({ visible, animation, name, eye, times, clinicianInstructions, bottleMl, dropsPerApplication, applicationsPerDay, openedOn, warningDays, language, confirmed, onConfirmed, onBack, onDismiss, onSave }: { visible: boolean; animation: "none" | "slide"; name: string; eye: Eye; times: string[]; clinicianInstructions: string; bottleMl: string; dropsPerApplication: string; applicationsPerDay: string; openedOn: string; warningDays: string; language: "en" | "es"; confirmed: boolean; onConfirmed: (value: boolean) => void; onBack: () => void; onDismiss: () => void; onSave: () => void }) {
   const spanish = language === "es";
@@ -4807,13 +4642,15 @@ function AddMedicationModal(props: ModalProps) {
   const [catalogQuery, setCatalogQuery] = useState("");
   const [showAllSuggestions, setShowAllSuggestions] = useState(false);
   const [showMedicationDetails, setShowMedicationDetails] = useState(true);
+  const [showOptionalInformation, setShowOptionalInformation] = useState(false);
   useEffect(() => {
     if (props.visible) {
       setCatalogQuery("");
       setShowAllSuggestions(false);
       setShowMedicationDetails(true);
+      setShowOptionalInformation(props.optionalInformationRequested);
     }
-  }, [props.visible]);
+  }, [props.visible, props.optionalInformationRequested]);
   const suggestions = searchMedications(catalogQuery, medicationFilter);
   const displayedSuggestions = showAllSuggestions
     ? suggestions
@@ -5114,6 +4951,17 @@ function AddMedicationModal(props: ModalProps) {
               </Text>
             </Pressable>
           </View>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ expanded: showOptionalInformation }}
+            accessibilityLabel={spanish ? "Mostrar u ocultar información opcional del medicamento" : "Show or hide optional medication information"}
+            onPress={() => setShowOptionalInformation((current) => !current)}
+            style={extraStyles.optionalInfoToggle}
+          >
+            <Text style={extraStyles.cardLink}>{showOptionalInformation ? (spanish ? "Ocultar información opcional" : "Hide optional information") : (spanish ? "Añadir información opcional" : "Add optional information")}</Text>
+            <Text style={extraStyles.supplyHelp}>{spanish ? "Instrucciones, contactos, receta, nota y estimación de suministro." : "Instructions, contacts, prescription, note, and supply estimate."}</Text>
+          </Pressable>
+          {showOptionalInformation && <>
           <Field label={spanish ? "Instrucciones de aplicación del profesional (opcional)" : "Clinician application instructions (optional)"}>
             <TextInput
               accessibilityLabel={spanish ? "Instrucciones de aplicación del profesional" : "Clinician application instructions"}
@@ -5280,6 +5128,7 @@ function AddMedicationModal(props: ModalProps) {
               {spanish ? "ClearCue estima usando 20 gotas por mL. El volumen real del frasco y el tamaño de la gota pueden variar." : "ClearCue estimates using 20 drops per mL. Actual bottle volume and drop size can vary."}
             </Text>
           </View>
+          </>}
           <Field label={spanish ? "¿Qué ojo?" : "Which eye?"}>
             <View style={styles.choiceRow}>
               {(["Left eye", "Right eye", "Both eyes"] as Eye[]).map((item) => (
@@ -5379,44 +5228,6 @@ function AddMedicationModal(props: ModalProps) {
               {props.isEditing ? (spanish ? "Guardar cambios" : "Save changes") : (spanish ? "Añadir a mi rutina" : "Add to my routine")}
             </Text>
           </Pressable>
-          {props.isEditing &&
-            (props.deleteConfirming ? (
-              <View style={extraStyles.deleteConfirm}>
-                <Text style={extraStyles.eraseTitle}>{spanish ? "¿Eliminar estas gotas?" : "Remove this eye drop?"}</Text>
-                <Text style={extraStyles.eraseText}>
-                  {spanish ? "Esto elimina de la rutina todos los horarios diarios de este medicamento." : "This removes all of this medication’s daily reminder times from the routine."}
-                </Text>
-                <View style={styles.choiceRow}>
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel={spanish ? "Conservar este medicamento" : "Keep this medication"}
-                    onPress={props.onCancelDelete}
-                    style={styles.choice}
-                  >
-                    <Text style={styles.choiceText}>{spanish ? "Conservar" : "Keep"}</Text>
-                  </Pressable>
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel={spanish ? "Confirmar eliminación de este medicamento" : "Confirm removal of this medication"}
-                    onPress={props.onConfirmDelete}
-                    style={extraStyles.deleteConfirmButton}
-                  >
-                    <Text style={extraStyles.deleteConfirmButtonText}>{spanish ? "Eliminar" : "Remove"}</Text>
-                  </Pressable>
-                </View>
-              </View>
-            ) : (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={spanish ? "Eliminar este medicamento" : "Remove this medication"}
-                onPress={props.onDelete}
-                style={{ padding: 14, alignItems: "center" }}
-              >
-                <Text style={{ color: "#B3362D", fontWeight: "800" }}>
-                  {spanish ? "Eliminar estas gotas" : "Remove this eye drop"}
-                </Text>
-              </Pressable>
-            ))}
         </ScrollView>
       </SafeAreaView>
     </Modal>
@@ -5898,6 +5709,7 @@ const styles = StyleSheet.create({
   homePager: { width: "100%" },
   homePagerContent: { alignItems: "flex-start" },
   homePage: { alignSelf: "flex-start" },
+  settingsHub: { paddingTop: 4, paddingBottom: 24, gap: 12 },
   homePageDots: {
     flexDirection: "row",
     justifyContent: "center",

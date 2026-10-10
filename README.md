@@ -49,7 +49,9 @@ The current ClearCue app is the Expo project in [`mobile/`](mobile). It is the o
 ### Current release — v1.27.0
 
 - Today now puts the reminder refresh and reminder checkup controls directly above the schedule. It continuously explains when refreshing is needed after routine or notification changes.
+- Reminder checkups now collapse when checked again and clear whenever the routine changes, so the next check reflects the current medications and times. Card actions wrap and stack on narrow screens instead of clipping text.
 - Settings is a third horizontal tab, with Accessibility & language, Privacy & data, a dedicated Caregiver alerts subsection, and the eye-drop guide. Medication cards now keep their guarded group-level Remove action beside Edit.
+- A connected caregiver can send a generic, rate-limited test alert to their own device. It confirms remote-notification delivery without sharing any medication or prescription details.
 - Optional clinician instructions, private contacts, prescription details, notes, and supply estimates are collapsed inside the medication editor until explicitly opened, keeping ordinary routine edits short.
 - Insights now use a 30-day calendar: each day's ring fills in proportion to planned doses marked taken, shows a checkmark when all are marked, and flags skipped or unrecorded doses. Insights and reports give both regular and Large text more room without changing streaks, patterns, or summary sharing.
 - Today’s timeline marks each scheduled dose as upcoming, due now, completed, late, or skipped. A late dose shows non-directive label/clinician safety guidance and record-only actions.

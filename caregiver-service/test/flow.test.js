@@ -94,3 +94,28 @@ test("pairing, skipped-dose suppression, demo pause, one alert, and revocation w
     globalThis.fetch = originalFetch;
   }
 });
+
+test("a connected caregiver can send a bounded generic test alert", async () => {
+  const env = { DB: database() };
+  const patient = (await post(env, "/plan/create")).body.secret;
+  const invite = await post(env, "/plan/invite", {}, patient);
+  const caregiver = (await post(env, "/pair", {
+    code: invite.body.code,
+    pushToken: "ExpoPushToken[bbbbbbbbbbbb]",
+    language: "en",
+  })).body.secret;
+  const originalFetch = globalThis.fetch;
+  const sent = [];
+  globalThis.fetch = async (_url, options) => {
+    sent.push(JSON.parse(options.body));
+    return new Response(JSON.stringify({ data: [{ status: "ok" }] }), { status: 200 });
+  };
+  try {
+    assert.equal((await post(env, "/caregiver/test", {}, caregiver)).status, 200);
+    assert.equal(sent.length, 1);
+    assert.match(sent[0].title, /test alert/);
+    assert.equal(sent[0].body.includes("medication"), false);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});

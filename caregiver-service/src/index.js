@@ -121,17 +121,21 @@ export function isAlertDue(targetMinute, doseMinute) {
   return difference >= 0 && difference < ALERT_WINDOW_MINUTES;
 }
 
-async function sendPush(token, language) {
+async function sendPush(token, language, test = false) {
   const spanish = language === "es";
   const response = await fetch("https://exp.host/--/api/v2/push/send", {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
       to: token,
-      title: spanish ? "Alerta de cuidado de ClearCue" : "ClearCue caregiver alert",
-      body: spanish
-        ? "No se ha registrado una dosis programada de gotas. Comunícate con la persona a quien ayudas."
-        : "A scheduled eye-drop dose has not been recorded. Please check in with the person you support.",
+      title: test
+        ? spanish ? "Prueba de alerta de ClearCue" : "ClearCue test alert"
+        : spanish ? "Alerta de cuidado de ClearCue" : "ClearCue caregiver alert",
+      body: test
+        ? spanish ? "Las notificaciones para cuidadores están conectadas en este dispositivo." : "Caregiver notifications are connected on this device."
+        : spanish
+          ? "No se ha registrado una dosis programada de gotas. Comunícate con la persona a quien ayudas."
+          : "A scheduled eye-drop dose has not been recorded. Please check in with the person you support.",
       sound: "default",
       channelId: "caregiver-alerts",
       data: { kind: "caregiver-alert" },
@@ -200,6 +204,11 @@ async function handleRequest(request, env) {
       await env.DB.prepare("UPDATE plans SET caregiver_push_token = ?, caregiver_language = ? WHERE id = ?")
         .bind(input.pushToken, input.language === "es" ? "es" : "en", plan.id).run();
       return reply({ connected: true });
+    }
+    if (path === "/caregiver/test") {
+      if (!await withinLimit(env, request, "caregiver-test", 5)) return reply({ error: "Too many test alerts" }, 429);
+      const sent = await sendPush(plan.caregiver_push_token, plan.caregiver_language, true);
+      return sent ? reply({ sent: true }) : reply({ error: "Push service did not accept the test alert" }, 502);
     }
     return reply({ error: "Not found" }, 404);
   }

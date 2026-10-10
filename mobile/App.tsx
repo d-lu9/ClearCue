@@ -859,7 +859,7 @@ const extraStyles = StyleSheet.create({
   },
   completedMedicationCard: { backgroundColor: "#FCF9F5" },
   medicationStripe: { width: 7 },
-  medicationBody: { flex: 1, padding: 15 },
+  medicationBody: { flex: 1, minWidth: 0, padding: 15 },
   medicationTop: { flexDirection: "row", gap: 12 },
   timeBlock: { alignItems: "flex-end", gap: 6 },
   groupedTimes: { marginTop: 14, gap: 9 },
@@ -870,7 +870,8 @@ const extraStyles = StyleSheet.create({
     paddingTop: 10,
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center",
+    alignItems: "flex-start",
+    flexWrap: "wrap",
     gap: 10,
   },
   statusBadge: {
@@ -910,11 +911,11 @@ const extraStyles = StyleSheet.create({
     paddingTop: 11,
     borderTopWidth: 1,
     borderTopColor: "#F2EBE4",
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+    flexDirection: "column",
+    alignItems: "flex-start",
+    gap: 8,
   },
-  cardLinks: { flexDirection: "row", gap: 7, alignItems: "center" },
+  cardLinks: { flexDirection: "row", flexWrap: "wrap", gap: 9, alignItems: "center", flexShrink: 1 },
   cardLink: { color: "#B85C4A", fontSize: 12, fontWeight: "800" },
   removeCardLink: { color: "#B3362D" },
   optionalInfoToggle: { borderWidth: 1, borderColor: "#D6C4B8", borderRadius: 14, padding: 14, gap: 4, backgroundColor: "#FFFDFB" },
@@ -1378,6 +1379,11 @@ export default function App() {
   const [onboardingStep, setOnboardingStep] = useState(0);
   const [launching, setLaunching] = useState(true);
   const splashOpacity = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    // A prior checkup can describe an older routine. Collapse it until the
+    // person asks again after any medication or reminder-state change.
+    setReminderCheckup(null);
+  }, [doses, remindersEnabled, remindersNeedRefresh, demoMode]);
   useEffect(() => {
     const timer = setTimeout(
       () =>
@@ -1998,6 +2004,10 @@ export default function App() {
     }
   }
   async function checkReminders() {
+    if (reminderCheckup) {
+      setReminderCheckup(null);
+      return;
+    }
     if (demoMode) {
       setReminderCheckup({
         tone: "attention",
@@ -2397,8 +2407,8 @@ export default function App() {
                     </Pressable>
                   </View>
                   <View style={extraStyles.reminderCheckup}>
-                    <Pressable accessibilityRole="button" accessibilityLabel={settings.language === "es" ? "Revisar confiabilidad de recordatorios" : "Check reminder reliability"} onPress={() => void checkReminders()} style={extraStyles.emptyGuide}>
-                      <Text style={extraStyles.cardLink}>{settings.language === "es" ? "Revisar recordatorios" : "Check reminders"}</Text>
+                    <Pressable accessibilityRole="button" accessibilityLabel={reminderCheckup ? (settings.language === "es" ? "Ocultar revisión de recordatorios" : "Hide reminder checkup") : (settings.language === "es" ? "Revisar confiabilidad de recordatorios" : "Check reminder reliability")} onPress={() => void checkReminders()} style={extraStyles.emptyGuide}>
+                      <Text style={extraStyles.cardLink}>{reminderCheckup ? (settings.language === "es" ? "Ocultar revisión" : "Hide checkup") : (settings.language === "es" ? "Revisar recordatorios" : "Check reminders")}</Text>
                     </Pressable>
                     {reminderCheckup && <View style={[extraStyles.reminderCheckupResult, reminderCheckup.tone === "attention" && extraStyles.reminderCheckupAttention, settings.colorBlindMode && extraStyles.monochromeCheckup]}><Text style={[extraStyles.reminderCheckupText, settings.colorBlindMode && extraStyles.monochromeText]}>{reminderCheckup.message}</Text>{reminderCheckup.next && <Text style={[extraStyles.reminderCheckupNext, settings.colorBlindMode && extraStyles.monochromeText]}>{settings.language === "es" ? "Próximo: " : "Next: "}{reminderCheckup.next}</Text>}</View>}
                   </View>

@@ -177,6 +177,18 @@ export function CaregiverModal({ visible, language, largeText, monochrome, demoM
     });
   }
 
+  function sendTestAlert() {
+    if (!secret) return;
+    void perform(async () => {
+      const pushToken = await caregiverPushToken();
+      await caregiverRequest("/caregiver/token", { pushToken, language }, secret);
+      await caregiverRequest<{ sent: true }>("/caregiver/test", {}, secret);
+      setNotice(es
+        ? "Se envió una alerta de prueba. Debería aparecer en unos momentos."
+        : "A test alert was sent. It should appear in a moment.");
+    });
+  }
+
   function stopSharing() {
     void perform(async () => {
       await deletePatientConnection();
@@ -248,6 +260,7 @@ export function CaregiverModal({ visible, language, largeText, monochrome, demoM
           </> : <>
             <Text style={[styles.label, textSize]}>{connected ? (es ? "Conectado para recibir alertas" : "Connected to receive alerts") : (es ? "Conexión pendiente" : "Connection pending")}</Text>
             {button(es ? "Comprobar notificaciones" : "Check notifications", refreshConnection, true)}
+            {connected && button(es ? "Enviar alerta de prueba" : "Send test alert", sendTestAlert)}
             {button(es ? "Dejar de recibir alertas" : "Stop receiving alerts", leaveCaregiver, true)}
           </>}
           {!!notice && <Text accessibilityLiveRegion="polite" style={[styles.warning, monochrome && styles.monochromeWarning, textSize]}>{notice}</Text>}

@@ -895,6 +895,13 @@ const extraStyles = StyleSheet.create({
   missedDoseActions: { flexDirection: "row", gap: 8 },
   missedDoseActionsLarge: { flexDirection: "column" },
   missedDoseAction: { flex: 1, minHeight: 44, justifyContent: "center" },
+  missedDoseActionLarge: {
+    width: "100%",
+    flex: 0,
+    minHeight: 56,
+    paddingVertical: 12,
+    justifyContent: "center",
+  },
   reminderCheckup: { marginTop: 18 },
   reminderCheckupResult: {
     backgroundColor: "#E7F0E9",
@@ -919,8 +926,11 @@ const extraStyles = StyleSheet.create({
   },
   medicationFooterLarge: { flexDirection: "column", alignItems: "stretch" },
   cardLinks: { flexDirection: "row", flexWrap: "wrap", gap: 9, alignItems: "center", flexShrink: 1, flex: 1 },
+  medicationFooterLinksLarge: { width: "100%", flex: 0, flexDirection: "column", alignItems: "stretch", gap: 4 },
+  footerTextButtonLarge: { width: "100%", minHeight: 48, paddingHorizontal: 10, paddingVertical: 11, justifyContent: "center" },
   cardLink: { color: "#B85C4A", fontSize: 12, fontWeight: "800" },
   removeMedicationButton: { borderWidth: 1, borderColor: "#B85C4A", borderRadius: 12, backgroundColor: "#FFF9F6", minHeight: 42, paddingHorizontal: 11, paddingVertical: 8, flexDirection: "row", gap: 7, justifyContent: "center", alignItems: "center" },
+  removeMedicationButtonLarge: { width: "100%", alignSelf: "stretch", marginHorizontal: 0, minHeight: 56, borderWidth: 1.5, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 12 },
   removeMedicationText: { color: "#9C4437", fontSize: 12, lineHeight: 18, fontWeight: "800", textAlign: "center" },
   monochromeRemoveMedicationButton: { borderColor: "#000000", backgroundColor: "#FFFFFF" },
   optionalInfoToggle: { borderWidth: 1, borderColor: "#D6C4B8", borderRadius: 14, padding: 14, gap: 4, backgroundColor: "#FFFDFB" },
@@ -3109,17 +3119,17 @@ function DoseCard({
                         accessibilityRole="button"
                         accessibilityLabel={language === "es" ? "Registrar como omitida" : "Record as skipped"}
                         onPress={() => onSkip(scheduledDose.id)}
-                        style={[styles.choice, extraStyles.missedDoseAction]}
+                        style={[styles.choice, extraStyles.missedDoseAction, largeText && extraStyles.missedDoseActionLarge]}
                       >
-                        <Text style={[styles.choiceText, largeText && styles.largeActionText]}>{language === "es" ? "Omitida" : "Skipped"}</Text>
+                        <Text style={[styles.choiceText, largeText && styles.largeActionText, largeText && styles.largeActionTextCentered]}>{language === "es" ? "Omitida" : "Skipped"}</Text>
                       </Pressable>
                       <Pressable
                         accessibilityRole="button"
                         accessibilityLabel={language === "es" ? "Registrar como tomada más tarde" : "Record as taken later"}
                         onPress={() => onToggle(scheduledDose.id)}
-                        style={[styles.doneButton, extraStyles.missedDoseAction, monochrome && styles.monochromeButton]}
+                        style={[styles.doneButton, extraStyles.missedDoseAction, largeText && extraStyles.missedDoseActionLarge, monochrome && styles.monochromeButton]}
                       >
-                        <Text style={[styles.doneText, largeText && styles.largeActionText]}>{language === "es" ? "Tomada más tarde" : "Taken later"}</Text>
+                        <Text style={[styles.doneText, largeText && styles.largeActionText, largeText && styles.largeActionTextCentered]}>{language === "es" ? "Tomada más tarde" : "Taken later"}</Text>
                       </Pressable>
                     </View>
                   </View>
@@ -3129,16 +3139,17 @@ function DoseCard({
           })}
         </View>
         <View style={[extraStyles.medicationFooter, largeText && extraStyles.medicationFooterLarge]}>
-          <View style={extraStyles.cardLinks}>
+          <View style={[extraStyles.cardLinks, largeText && extraStyles.medicationFooterLinksLarge]}>
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={language === "es" ? `Editar ${dose.name}` : `Edit ${dose.name}`}
               onPress={onEdit}
+              style={largeText ? extraStyles.footerTextButtonLarge : undefined}
             >
-              <Text style={[extraStyles.cardLink, largeText && styles.largeCardLink, monochrome && extraStyles.monochromeText]}>{language === "es" ? "Editar" : "Edit"}</Text>
+              <Text style={[extraStyles.cardLink, largeText && styles.largeCardLink, largeText && styles.largeActionTextCentered, monochrome && extraStyles.monochromeText]}>{language === "es" ? "Editar" : "Edit"}</Text>
             </Pressable>
-            <Pressable accessibilityRole="button" accessibilityLabel={language === "es" ? `Editar información opcional de ${dose.name}` : `Edit optional information for ${dose.name}`} onPress={onOptionalInfo}>
-              <Text style={[extraStyles.cardLink, largeText && styles.largeCardLink, monochrome && extraStyles.monochromeText]}>{language === "es" ? "Info. opcional" : "Optional info"}</Text>
+            <Pressable accessibilityRole="button" accessibilityLabel={language === "es" ? `Editar información opcional de ${dose.name}` : `Edit optional information for ${dose.name}`} onPress={onOptionalInfo} style={largeText ? extraStyles.footerTextButtonLarge : undefined}>
+              <Text style={[extraStyles.cardLink, largeText && styles.largeCardLink, largeText && styles.largeActionTextCentered, monochrome && extraStyles.monochromeText]}>{language === "es" ? "Info. opcional" : "Optional info"}</Text>
             </Pressable>
           </View>
           <Pressable
@@ -3146,10 +3157,10 @@ function DoseCard({
             accessibilityLabel={language === "es" ? `Eliminar medicamento ${dose.name}` : `Remove medication ${dose.name}`}
             accessibilityHint={language === "es" ? "Pide confirmación antes de eliminar todos los horarios y el historial de este medicamento." : "Asks for confirmation before removing every schedule time and recorded history for this medication."}
             onPress={onRemove}
-            style={[extraStyles.removeMedicationButton, monochrome && extraStyles.monochromeRemoveMedicationButton]}
+            style={[extraStyles.removeMedicationButton, largeText && extraStyles.removeMedicationButtonLarge, monochrome && extraStyles.monochromeRemoveMedicationButton]}
           >
             <MedicationRemoveIcon largeText={largeText} monochrome={monochrome} />
-            <Text style={[extraStyles.removeMedicationText, largeText && styles.largeCardLink, monochrome && extraStyles.monochromeText]}>{language === "es" ? "Eliminar medicamento" : "Remove medication"}</Text>
+            <Text style={[extraStyles.removeMedicationText, largeText && styles.largeCardLink, largeText && styles.largeActionTextCentered, monochrome && extraStyles.monochromeText]}>{language === "es" ? "Eliminar medicamento" : "Remove medication"}</Text>
           </Pressable>
         </View>
         {removing && <View style={extraStyles.deleteConfirm}>
@@ -6196,6 +6207,7 @@ const styles = StyleSheet.create({
   largeHomeActionDetail: { fontSize: 16, lineHeight: 23 },
   largeCardLink: { fontSize: 16, lineHeight: 22 },
   largeActionText: { fontSize: 18, lineHeight: 25 },
+  largeActionTextCentered: { textAlign: "center", flexShrink: 1 },
   largeMissedDoseSafetyText: { fontSize: 18, lineHeight: 26 },
   largeContent: { paddingHorizontal: 24 },
   highContrastRoot: { backgroundColor: "#FFFFFF" },

@@ -3152,7 +3152,6 @@ function DoseCard({
             <Text style={[extraStyles.removeMedicationText, largeText && styles.largeCardLink, monochrome && extraStyles.monochromeText]}>{language === "es" ? "Eliminar medicamento" : "Remove medication"}</Text>
           </Pressable>
         </View>
-        <Text style={[extraStyles.supplyHelp, monochrome && extraStyles.monochromeMutedText]}>{language === "es" ? "Cada hora se registra por separado." : "Each time is tracked separately."}</Text>
         {removing && <View style={extraStyles.deleteConfirm}>
           <Text style={extraStyles.eraseTitle}>{language === "es" ? "¿Eliminar estas gotas?" : "Remove this eye drop?"}</Text>
           <Text style={extraStyles.eraseText}>{language === "es" ? "Esto elimina de la rutina todos los horarios diarios de este medicamento y su historial registrado." : "This removes every daily reminder time for this medication and its recorded history from this device."}</Text>

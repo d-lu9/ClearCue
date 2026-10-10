@@ -3,7 +3,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as LocalAuthentication from "expo-local-authentication";
 import * as Notifications from "expo-notifications";
 import * as SecureStore from "expo-secure-store";
-import Svg, { Circle } from "react-native-svg";
+import Svg, { Circle, Path } from "react-native-svg";
 import { CaregiverModal } from "./CaregiverModal";
 import { CaregiverRecord, CaregiverSchedule, deletePatientConnection } from "./caregiver";
 import {
@@ -862,12 +862,12 @@ const extraStyles = StyleSheet.create({
   medicationBody: { flex: 1, minWidth: 0, padding: 15 },
   medicationTop: { flexDirection: "row", gap: 12 },
   timeBlock: { alignItems: "flex-end", gap: 6 },
-  groupedTimes: { marginTop: 14, gap: 9 },
-  groupedTimeItem: { gap: 9 },
+  groupedTimes: { marginTop: 16, gap: 13 },
+  groupedTimeItem: { gap: 11 },
   groupedTimeRow: {
-    borderTopWidth: 1,
-    borderTopColor: "#F2EBE4",
-    paddingTop: 10,
+    borderTopWidth: 0.5,
+    borderTopColor: "#EDE5DE",
+    paddingTop: 13,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
@@ -920,8 +920,8 @@ const extraStyles = StyleSheet.create({
   medicationFooterLarge: { flexDirection: "column", alignItems: "stretch" },
   cardLinks: { flexDirection: "row", flexWrap: "wrap", gap: 9, alignItems: "center", flexShrink: 1, flex: 1 },
   cardLink: { color: "#B85C4A", fontSize: 12, fontWeight: "800" },
-  removeMedicationButton: { borderWidth: 2, borderColor: "#B3362D", borderRadius: 10, backgroundColor: "#FFF7F6", minHeight: 40, paddingHorizontal: 11, paddingVertical: 8, justifyContent: "center", alignItems: "center" },
-  removeMedicationText: { color: "#B3362D", fontSize: 12, lineHeight: 18, fontWeight: "800", textAlign: "center" },
+  removeMedicationButton: { borderWidth: 1, borderColor: "#B85C4A", borderRadius: 12, backgroundColor: "#FFF9F6", minHeight: 42, paddingHorizontal: 11, paddingVertical: 8, flexDirection: "row", gap: 7, justifyContent: "center", alignItems: "center" },
+  removeMedicationText: { color: "#9C4437", fontSize: 12, lineHeight: 18, fontWeight: "800", textAlign: "center" },
   monochromeRemoveMedicationButton: { borderColor: "#000000", backgroundColor: "#FFFFFF" },
   optionalInfoToggle: { borderWidth: 1, borderColor: "#D6C4B8", borderRadius: 14, padding: 14, gap: 4, backgroundColor: "#FFFDFB" },
   cardLinkDivider: { color: "#D6C4B8", fontSize: 14 },
@@ -2932,6 +2932,15 @@ function SettingsHub({ language, largeText, monochrome, onAccessibility, onPriva
     </View>
   </View>;
 }
+function MedicationRemoveIcon({ largeText, monochrome }: { largeText: boolean; monochrome: boolean }) {
+  const color = monochrome ? "#000000" : "#B85C4A";
+  const size = largeText ? 23 : 19;
+  return <Svg width={size} height={size} viewBox="0 0 24 24" accessibilityElementsHidden>
+    <Circle cx="12" cy="12" r="10" stroke={color} strokeWidth="1.35" fill="none" />
+    <Path d="M8.4 8.8h7.2l-.65 8.1H9.05L8.4 8.8Zm2.15-2.15h2.9l.55 1.25H10l.55-1.25ZM7.5 7.9h9" stroke={color} strokeWidth="1.45" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+    <Path d="M10.7 10.7v4.3m2.6-4.3v4.3" stroke={color} strokeWidth="1.3" strokeLinecap="round" />
+  </Svg>;
+}
 function DoseCard({
   doses,
   language,
@@ -3139,7 +3148,8 @@ function DoseCard({
             onPress={onRemove}
             style={[extraStyles.removeMedicationButton, monochrome && extraStyles.monochromeRemoveMedicationButton]}
           >
-            <Text style={[extraStyles.removeMedicationText, largeText && styles.largeCardLink, monochrome && extraStyles.monochromeText]}>🗑️ {language === "es" ? "Eliminar medicamento" : "Remove medication"}</Text>
+            <MedicationRemoveIcon largeText={largeText} monochrome={monochrome} />
+            <Text style={[extraStyles.removeMedicationText, largeText && styles.largeCardLink, monochrome && extraStyles.monochromeText]}>{language === "es" ? "Eliminar medicamento" : "Remove medication"}</Text>
           </Pressable>
         </View>
         <Text style={[extraStyles.supplyHelp, monochrome && extraStyles.monochromeMutedText]}>{language === "es" ? "Cada hora se registra por separado." : "Each time is tracked separately."}</Text>

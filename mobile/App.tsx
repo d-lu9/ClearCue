@@ -5187,7 +5187,17 @@ function AddMedicationModal(props: ModalProps) {
                       props.eye === item && styles.choiceTextSelected,
                     ]}
                   >
-                    {localizedEye(item, props.language).replace(spanish ? "Ojo " : " eye", "")}
+                    {spanish
+                      ? item === "Left eye"
+                        ? "Izquierdo"
+                        : item === "Right eye"
+                          ? "Derecho"
+                          : "Ambos"
+                      : item === "Left eye"
+                        ? "Left"
+                        : item === "Right eye"
+                          ? "Right"
+                          : "Both"}
                   </Text>
                 </Pressable>
               ))}

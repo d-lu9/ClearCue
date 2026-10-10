@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import * as SecureStore from "expo-secure-store";
 import { AppState, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -35,6 +35,7 @@ export function CaregiverModal({ visible, language, largeText, monochrome, demoM
   const [notice, setNotice] = useState("");
   const [lastSync, setLastSync] = useState<Date | null>(null);
   const [refresh, setRefresh] = useState(0);
+  const connectionCheckVersion = useRef(0);
   const textSize = largeText ? styles.largeText : undefined;
   const titleSize = largeText ? styles.largeTitle : undefined;
   const colorStyle = monochrome ? styles.monochrome : undefined;
@@ -42,6 +43,7 @@ export function CaregiverModal({ visible, language, largeText, monochrome, demoM
   useEffect(() => {
     if (!CAREGIVER_API_URL) return;
     let active = true;
+    const checkVersion = ++connectionCheckVersion.current;
     void Promise.all([getPatientSecret(), getCaregiverSecret()]).then(([patient, caregiver]) => {
       if (!active) return;
       const currentRole = patient ? "patient" : caregiver ? "caregiver" : null;
@@ -53,13 +55,13 @@ export function CaregiverModal({ visible, language, largeText, monochrome, demoM
       if (currentSecret) {
         void caregiverRequest<{ connected: boolean }>(currentRole === "patient" ? "/plan/status" : "/caregiver/status", {}, currentSecret)
           .then((result) => {
-            if (active) {
+            if (active && checkVersion === connectionCheckVersion.current) {
               setConnected(result.connected);
               setNotice("");
             }
           })
           .catch(() => {
-            if (active) {
+            if (active && checkVersion === connectionCheckVersion.current) {
               setConnected(false);
               setNotice(es ? "No se pudo verificar la conexión. Revisa Internet." : "Could not check the connection. Check your internet access.");
             }
@@ -112,16 +114,16 @@ export function CaregiverModal({ visible, language, largeText, monochrome, demoM
     return () => listener.remove();
   }, []);
 
-  async function perform(action: () => Promise<void>) {
+  async function perform(action: () => Promise<void>, errorNotice?: (error: unknown) => string) {
     if (busy) return;
     setBusy(true);
     setNotice("");
     try { await action(); }
     catch (error) {
       const denied = error instanceof Error && error.message === "permission-denied";
-      setNotice(denied
+      setNotice(errorNotice?.(error) ?? (denied
         ? es ? "Permite las notificaciones para recibir alertas de cuidado." : "Allow notifications to receive caregiver alerts."
-        : es ? "No se pudo completar. Comprueba Internet y vuelve a intentarlo." : "Could not complete this. Check your internet access and try again.");
+        : es ? "No se pudo completar. Comprueba Internet y vuelve a intentarlo." : "Could not complete this. Check your internet access and try again."));
     } finally { setBusy(false); }
   }
 
@@ -183,9 +185,21 @@ export function CaregiverModal({ visible, language, largeText, monochrome, demoM
       const pushToken = await caregiverPushToken();
       await caregiverRequest("/caregiver/token", { pushToken, language }, secret);
       await caregiverRequest<{ sent: true }>("/caregiver/test", {}, secret);
+      connectionCheckVersion.current += 1;
       setNotice(es
         ? "Se envió una alerta de prueba. Debería aparecer en unos momentos."
         : "A test alert was sent. It should appear in a moment.");
+    }, (error) => {
+      const code = error instanceof Error ? error.message : "";
+      if (code === "permission-denied")
+        return es ? "Permite las notificaciones para recibir la alerta de prueba." : "Allow notifications to receive the test alert.";
+      if (code === "service-429")
+        return es ? "Ya enviaste el máximo de 5 alertas de prueba esta hora. Inténtalo más tarde." : "You have already sent the maximum of five test alerts this hour. Try again later.";
+      if (code === "service-401")
+        return es ? "La conexión del cuidador ya no es válida. Vuelve a vincular los dispositivos." : "The caregiver connection is no longer valid. Link the devices again.";
+      return es
+        ? "No se confirmó el envío de la alerta de prueba. Comprueba Internet y vuelve a intentarlo."
+        : "The test alert could not be confirmed. Check your internet access and try again.";
     });
   }
 

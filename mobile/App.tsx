@@ -911,13 +911,18 @@ const extraStyles = StyleSheet.create({
     paddingTop: 11,
     borderTopWidth: 1,
     borderTopColor: "#F2EBE4",
-    flexDirection: "column",
-    alignItems: "flex-start",
-    gap: 8,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 10,
   },
-  cardLinks: { flexDirection: "row", flexWrap: "wrap", gap: 9, alignItems: "center", flexShrink: 1 },
+  medicationFooterLarge: { flexDirection: "column", alignItems: "stretch" },
+  cardLinks: { flexDirection: "row", flexWrap: "wrap", gap: 9, alignItems: "center", flexShrink: 1, flex: 1 },
   cardLink: { color: "#B85C4A", fontSize: 12, fontWeight: "800" },
-  removeCardLink: { color: "#B3362D" },
+  removeMedicationButton: { borderWidth: 2, borderColor: "#B3362D", borderRadius: 10, backgroundColor: "#FFF7F6", minHeight: 40, paddingHorizontal: 11, paddingVertical: 8, justifyContent: "center", alignItems: "center" },
+  removeMedicationText: { color: "#B3362D", fontSize: 12, lineHeight: 18, fontWeight: "800", textAlign: "center" },
+  monochromeRemoveMedicationButton: { borderColor: "#000000", backgroundColor: "#FFFFFF" },
   optionalInfoToggle: { borderWidth: 1, borderColor: "#D6C4B8", borderRadius: 14, padding: 14, gap: 4, backgroundColor: "#FFFDFB" },
   cardLinkDivider: { color: "#D6C4B8", fontSize: 14 },
   emptyRoutine: {
@@ -3114,7 +3119,7 @@ function DoseCard({
             );
           })}
         </View>
-        <View style={extraStyles.medicationFooter}>
+        <View style={[extraStyles.medicationFooter, largeText && extraStyles.medicationFooterLarge]}>
           <View style={extraStyles.cardLinks}>
             <Pressable
               accessibilityRole="button"
@@ -3126,18 +3131,18 @@ function DoseCard({
             <Pressable accessibilityRole="button" accessibilityLabel={language === "es" ? `Editar información opcional de ${dose.name}` : `Edit optional information for ${dose.name}`} onPress={onOptionalInfo}>
               <Text style={[extraStyles.cardLink, largeText && styles.largeCardLink, monochrome && extraStyles.monochromeText]}>{language === "es" ? "Info. opcional" : "Optional info"}</Text>
             </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={language === "es" ? `Eliminar ${dose.name}` : `Remove ${dose.name}`}
-              onPress={onRemove}
-            >
-              <Text style={[extraStyles.cardLink, extraStyles.removeCardLink, largeText && styles.largeCardLink]}>{language === "es" ? "Eliminar" : "Remove"}</Text>
-            </Pressable>
           </View>
-          <Text style={[extraStyles.supplyHelp, monochrome && extraStyles.monochromeMutedText]}>
-            {language === "es" ? "Cada hora se registra por separado." : "Each time is tracked separately."}
-          </Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={language === "es" ? `Eliminar medicamento ${dose.name}` : `Remove medication ${dose.name}`}
+            accessibilityHint={language === "es" ? "Pide confirmación antes de eliminar todos los horarios y el historial de este medicamento." : "Asks for confirmation before removing every schedule time and recorded history for this medication."}
+            onPress={onRemove}
+            style={[extraStyles.removeMedicationButton, monochrome && extraStyles.monochromeRemoveMedicationButton]}
+          >
+            <Text style={[extraStyles.removeMedicationText, largeText && styles.largeCardLink, monochrome && extraStyles.monochromeText]}>🗑️ {language === "es" ? "Eliminar medicamento" : "Remove medication"}</Text>
+          </Pressable>
         </View>
+        <Text style={[extraStyles.supplyHelp, monochrome && extraStyles.monochromeMutedText]}>{language === "es" ? "Cada hora se registra por separado." : "Each time is tracked separately."}</Text>
         {removing && <View style={extraStyles.deleteConfirm}>
           <Text style={extraStyles.eraseTitle}>{language === "es" ? "¿Eliminar estas gotas?" : "Remove this eye drop?"}</Text>
           <Text style={extraStyles.eraseText}>{language === "es" ? "Esto elimina de la rutina todos los horarios diarios de este medicamento y su historial registrado." : "This removes every daily reminder time for this medication and its recorded history from this device."}</Text>

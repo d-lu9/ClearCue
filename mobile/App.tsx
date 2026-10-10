@@ -3354,7 +3354,10 @@ function AdherencePanel({
   const firstWeekday = firstDay ? new Date(`${firstDay}T12:00:00`).getDay() : 0;
   const leadingCells = spanish ? (firstWeekday + 6) % 7 : firstWeekday;
   const weekdays = spanish ? ["Lu", "Ma", "Mi", "Ju", "Vi", "Sá", "Do"] : ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
-  const circleSize = Math.max(28, Math.min(largeText ? 46 : 40, calendarWidth / 7 - 5 || 40));
+  // Keep each ring inside one of the seven calendar columns, including on narrow screens
+  // and before the grid has reported its measured width.
+  const columnSize = calendarWidth ? Math.floor(calendarWidth / 7) : 28;
+  const circleSize = Math.max(22, Math.min(largeText ? 46 : 40, columnSize - 6));
   const dateRange = firstDay && lastDay
     ? `${new Date(`${firstDay}T12:00:00`).toLocaleDateString(spanish ? "es-419" : "en-US", { month: "short", day: "numeric" })} – ${new Date(`${lastDay}T12:00:00`).toLocaleDateString(spanish ? "es-419" : "en-US", { month: "short", day: "numeric" })}`
     : "";
@@ -5741,9 +5744,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
   },
-  homePager: { width: "100%" },
+  homePager: { width: "100%", overflow: "hidden" },
   homePagerContent: { alignItems: "flex-start" },
-  homePage: { alignSelf: "flex-start" },
+  homePage: { alignSelf: "flex-start", overflow: "hidden" },
   settingsHub: { paddingTop: 4, paddingBottom: 24, gap: 12 },
   homePageDots: {
     flexDirection: "row",
@@ -5874,7 +5877,7 @@ const styles = StyleSheet.create({
   largeCalendarCenter: { fontSize: 12 },
   calendarDate: { fontSize: 12, lineHeight: 17, color: "#6F625B", fontWeight: "700", marginTop: 3 },
   largeCalendarDate: { fontSize: 16, lineHeight: 23, marginTop: 5 },
-  calendarMissedMarker: { position: "absolute", width: 8, height: 8, borderRadius: 4, right: -1, bottom: -1, backgroundColor: "#B85C4A", borderWidth: 1, borderColor: "#FFFFFF" },
+  calendarMissedMarker: { position: "absolute", width: 8, height: 8, borderRadius: 4, right: 0, bottom: 0, backgroundColor: "#B85C4A", borderWidth: 1, borderColor: "#FFFFFF" },
   legend: { flexDirection: "row", flexWrap: "wrap", gap: 12, marginTop: 17 },
   largeLegend: { gap: 16, marginTop: 23 },
   legendItem: { flexDirection: "row", alignItems: "center", gap: 6, flexShrink: 1 },

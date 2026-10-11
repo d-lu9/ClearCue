@@ -36,6 +36,7 @@ export function CaregiverModal({ visible, language, largeText, monochrome, demoM
   const [lastSync, setLastSync] = useState<Date | null>(null);
   const [refresh, setRefresh] = useState(0);
   const connectionCheckVersion = useRef(0);
+  const actionInProgress = useRef(false);
   const textSize = largeText ? styles.largeText : undefined;
   const titleSize = largeText ? styles.largeTitle : undefined;
   const colorStyle = monochrome ? styles.monochrome : undefined;
@@ -115,7 +116,8 @@ export function CaregiverModal({ visible, language, largeText, monochrome, demoM
   }, []);
 
   async function perform(action: () => Promise<void>, errorNotice?: (error: unknown) => string) {
-    if (busy) return;
+    if (actionInProgress.current) return;
+    actionInProgress.current = true;
     setBusy(true);
     setNotice("");
     try { await action(); }
@@ -124,7 +126,10 @@ export function CaregiverModal({ visible, language, largeText, monochrome, demoM
       setNotice(errorNotice?.(error) ?? (denied
         ? es ? "Permite las notificaciones para recibir alertas de cuidado." : "Allow notifications to receive caregiver alerts."
         : es ? "No se pudo completar. Comprueba Internet y vuelve a intentarlo." : "Could not complete this. Check your internet access and try again."));
-    } finally { setBusy(false); }
+    } finally {
+      actionInProgress.current = false;
+      setBusy(false);
+    }
   }
 
   function startPatient() {

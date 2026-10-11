@@ -83,8 +83,8 @@ test("pairing, skipped-dose suppression, demo pause, one alert, and revocation w
 
     await post(env, "/plan/pause", { paused: false }, patient);
     await cron(env, alertTime);
-    await cron(env, alertTime);
-    assert.equal(sent.length, 1, "the same unrecorded dose should alert once");
+    await cron(env, new Date(`${date}T09:12:00.000Z`));
+    assert.equal(sent.length, 1, "the same unrecorded dose should alert once across the full alert window");
     assert.match(sent[0].body, /No se ha registrado/);
     assert.equal(sent[0].body.includes("dose-1"), false);
 
